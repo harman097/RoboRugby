@@ -42,6 +42,19 @@ while blnRunGame:
         if dctKeyDown[const.KEY_LEFT_MOTOR_BACKWARD]: lngLThrust -= 1
         if dctKeyDown[const.KEY_RIGHT_MOTOR_FORWARD]: lngRThrust += 1
         if dctKeyDown[const.KEY_RIGHT_MOTOR_BACKWARD]: lngRThrust -= 1
+        if dctKeyDown[const.KEY_BOTH_MOTOR_FORWARD]:
+            lngLThrust += 1
+            lngRThrust += 1
+        if dctKeyDown[const.KEY_BOTH_MOTOR_BACKWARD]:
+            lngLThrust -= 1
+            lngRThrust -= 1
+        if dctKeyDown[const.KEY_BOTH_MOTOR_LEFT]:
+            lngLThrust -= 1
+            lngRThrust += 1
+        if dctKeyDown[const.KEY_BOTH_MOTOR_RIGHT]:
+            lngLThrust += 1
+            lngRThrust -= 1
+
 
         env.step((lngLThrust, lngRThrust))
     else:
