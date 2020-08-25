@@ -5,11 +5,11 @@ import RR_Constants as const
 
 class Robot(pygame.sprite.Sprite):
 
-    ssurfHappyRobot = pygame.image.load("Robot_40x20.png").convert()
+    ssurfHappyRobot = pygame.image.load("Happy_Robot_40x20.png").convert()
     ssurfHappyRobot.set_colorkey((0,0,0), pygame.RLEACCEL)
     slngHappyRobotInitialRot = 90
-    ssurfGrumpyRobot = ssurfHappyRobot.copy()  # todo make a grumpy robot
-    # ssurfGrumpyRobot.set_colorkey((0, 0, 0), pygame.RLEACCEL)
+    ssurfGrumpyRobot = pygame.image.load("Grumpy_Robot_40x20.png").convert()
+    ssurfGrumpyRobot.set_colorkey((0, 0, 0), pygame.RLEACCEL)
     slngGrumpyRobotInitialRot = 90
 
     def __init__(self, intTeam):
