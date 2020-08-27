@@ -1,6 +1,7 @@
 import RR_Constants as const
 import pygame
 import random
+from MyUtils import FloatRect
 
 class Ball(pygame.sprite.Sprite):
     def __init__(self, tplColor):
@@ -18,28 +19,36 @@ class Ball(pygame.sprite.Sprite):
             )
         # self.rect = self.surf.get_rect(center=(tplCenter))
 
+        # integer rect, used by pygame for rendering
         self.rect = self.surf.get_rect(center=tplCenter)
         pygame.draw.circle(self.surf, self.tplColor, (const.BALL_RADIUS, const.BALL_RADIUS), const.BALL_RADIUS)
-        self.rectPrior = self.rect.copy()
+
+        # actual rect, used internally to calculate location
+        self.dblRect = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
+        self.dblRectPrior = self.dblRect.copy()
 
     def move(self):
-        self.rectPrior = self.rect.copy()
-        self.rect.move_ip(self.dblXVelocity, self.dblYVelocity)
+        self.dblRectPrior = self.dblRect.copy()
+        self.dblRect.left += self.dblXVelocity
+        self.dblRect.top += self.dblYVelocity
 
         # Bounce the ball off the wall
         # "K_Wall" = how much to dampen the bounce
-        if self.rect.left < 0:
-            self.rect.left *= -1 * const.BOUNCE_K_WALL
+        if self.dblRect.left < 0:
+            self.dblRect.left *= -1 * const.BOUNCE_K_WALL
             self.dblXVelocity *= -1 * const.BOUNCE_K_WALL
-        if self.rect.right > const.ARENA_WIDTH:
-            self.rect.right = const.ARENA_WIDTH - (self.rect.right - const.ARENA_WIDTH) * const.BOUNCE_K_WALL
+        if self.dblRect.right > const.ARENA_WIDTH:
+            self.dblRect.right = const.ARENA_WIDTH - (self.dblRect.right - const.ARENA_WIDTH) * const.BOUNCE_K_WALL
             self.dblXVelocity *= -1 * const.BOUNCE_K_WALL
-        if self.rect.top <= 0:
-            self.rect.top *= -1 * const.BOUNCE_K_WALL
+        if self.dblRect.top <= 0:
+            self.dblRect.top *= -1 * const.BOUNCE_K_WALL
             self.dblYVelocity *= -1 * const.BOUNCE_K_WALL
-        if self.rect.bottom >= const.ARENA_HEIGHT:
-            self.rect.bottom = const.ARENA_HEIGHT - (self.rect.bottom - const.ARENA_WIDTH) * const.BOUNCE_K_WALL
+        if self.dblRect.bottom >= const.ARENA_HEIGHT:
+            self.dblRect.bottom = const.ARENA_HEIGHT - (self.dblRect.bottom - const.ARENA_WIDTH) * const.BOUNCE_K_WALL
             self.dblYVelocity *= -1 * const.BOUNCE_K_WALL
+
+        self.rect.left = int(self.dblRect.left)
+        self.rect.top = int(self.dblRect.top)
 
         self.dblXVelocity *= const.BALL_SLOWDOWN
         self.dblYVelocity *= const.BALL_SLOWDOWN

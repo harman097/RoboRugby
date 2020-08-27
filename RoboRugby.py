@@ -129,13 +129,13 @@ class GameEnv(gym.Env):
         while True:
             lngNaughtyLoop += 1
             if lngNaughtyLoop > 2:
-                break
+                # break
                 # TODO figure out why we still hit this
-                # raise Exception("Screw this.")
+                raise Exception("Screw this.")
             blnNaughtyBots = False
             
             for sprRobot1 in self.grpRobots.sprites():
-                for sprRobot2 in pygame.sprite.spritecollide(sprRobot1, self.grpRobots, False, collided=TrashyPhysics.check_robot_robot_collision):
+                for sprRobot2 in pygame.sprite.spritecollide(sprRobot1, self.grpRobots, False, collided=TrashyPhysics.robots_collided):
                     # TODO deduct some points here but... who gets deducted? "who smashed who" should matter...
                     if not sprRobot1 is sprRobot2:
                         blnNaughtyBots = True
@@ -165,21 +165,24 @@ class GameEnv(gym.Env):
                 # Determine the vector the robot has actually traveled (don't trust thrust)
 
                 # Trashy trash solely so it's interesting, for the moment
-                lngDeltaX = objRobot.rect.centerx - objRobot.rectPrior.centerx
-                lngDeltaY = objRobot.rect.centery - objRobot.rectPrior.centery
+                dblDeltaX = objRobot.dblRect.centerx - objRobot.dblRectPrior.centerx
+                dblDeltaY = objRobot.dblRect.centery - objRobot.dblRectPrior.centery
 
-                if lngDeltaX > 0:
-                    sprBall.dblXVelocity = max(lngDeltaX, sprBall.dblXVelocity)
+                if dblDeltaX > 0:
+                    sprBall.dblXVelocity = max(dblDeltaX, sprBall.dblXVelocity)
                 else:
-                    sprBall.dblXVelocity = min(lngDeltaX, sprBall.dblXVelocity)
+                    sprBall.dblXVelocity = min(dblDeltaX, sprBall.dblXVelocity)
 
-                if lngDeltaY > 0:
-                    sprBall.dblYVelocity = max(lngDeltaY, sprBall.dblYVelocity)
+                if dblDeltaY > 0:
+                    sprBall.dblYVelocity = max(dblDeltaY, sprBall.dblYVelocity)
                 else:
-                    sprBall.dblYVelocity = min(lngDeltaY, sprBall.dblYVelocity)
+                    sprBall.dblYVelocity = min(dblDeltaY, sprBall.dblYVelocity)
 
-                # TODO this is absolute trash
-                sprBall.rect.move_ip(lngDeltaX, lngDeltaY)
+                # TODO this is kind of trash but whatever
+                sprBall.dblRect.left += dblDeltaX
+                sprBall.dblRect.top += dblDeltaY
+                sprBall.rect.left = sprBall.dblRect.left
+                sprBall.rect.top = sprBall.dblRect.top
 
         # Pseudo "good enough" code
         # Check for robot-on-ball collision
@@ -214,6 +217,8 @@ class GameEnv(gym.Env):
         # todo this for everything that has it
         self.sprHappyGoal.on_step_end()
         self.sprGrumpyGoal.on_step_end()
+        for sprRobot in self.grpRobots.sprites():
+            sprRobot.on_step_end()
 
         return self._get_game_state(), self._get_reward(), self.game_is_done(), self._get_debug_info()
 

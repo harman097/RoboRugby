@@ -1,7 +1,9 @@
 import pygame
+from typing import Tuple, Dict, List
 import math
 import random
 import RR_Constants as const
+from MyUtils import FloatRect
 
 class Robot(pygame.sprite.Sprite):
 
@@ -51,7 +53,10 @@ class Robot(pygame.sprite.Sprite):
                     random.randint(const.ROBOT_LENGTH/2, const.ARENA_HEIGHT/2 - const.ROBOT_LENGTH/2)
                 )
             )
-        self.rectPrior = self.rect.copy()
+
+        # self.rect = rendering (integers), self.dblRect = location calc (float)
+        self.dblRect = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
+        self.dblRectPrior = self.dblRect.copy()
 
     def set_thrust(self, lngLThrust, lngRThrust):
         self.lngLThrust = lngLThrust
@@ -59,8 +64,11 @@ class Robot(pygame.sprite.Sprite):
 
     def on_step_begin(self):
         self.lngMoveSpeedRem = self.lngMoveSpeed
-        self.rectPrior = self.rect.copy()
+        self.dblRectPrior = self.dblRect.copy()
         self.dblRotationPrior = self.dblRotation
+
+    def on_step_end(self):
+        self.rect.center = self.dblRect.center
 
     def move_all(self):
         if self.lngMoveSpeedRem <= 0:
@@ -78,9 +86,14 @@ class Robot(pygame.sprite.Sprite):
 
     def undo_move(self):
         self.lngMoveSpeedRem = self.lngMoveSpeed
-        self.rect.left = self.rectPrior.left
-        self.rect.top = self.rectPrior.top
-        self.dblRotation = self.dblRotationPrior
+        self.dblRect = self.dblRectPrior.copy()
+
+        if self.dblRotation != self.dblRotationPrior:
+            self.dblRotation = self.dblRotationPrior
+            self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
+            self.rect = self.surf.get_rect(center=self.dblRect.center)
+        else:
+            self.rect.center = self.dblRect.center
 
     def _move_internal(self, lngSpeed):
 
@@ -99,7 +112,7 @@ class Robot(pygame.sprite.Sprite):
             else:  # negative rotation
                 lngAngularVel = -1 * const.ROBOT_ANGULAR_VEL_BOTH * lngSpeed
 
-            self._move_angular(lngAngularVel, self.rect.center, 0)
+            self._move_angular(lngAngularVel)
 
         else:  # Rotate around a track
 
@@ -113,164 +126,63 @@ class Robot(pygame.sprite.Sprite):
             if self.lngRThrust != 0:  # rotate around left track
                 dblRadians = math.radians(self.dblRotation + 90)
                 tplCenterRot = (  # center of left track
-                    self.rect.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
-                    self.rect.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
+                    self.dblRect.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
+                    self.dblRect.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
                 )
-
-                # TODO remove or set up tests or something
-                switch_ValidateCenterRot = {
-                    0:lambda tplCB, tplCT: tplCB[0] == round(tplCT[0]) and \
-                                           tplCB[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER == round(tplCT[1]),
-
-                    180: lambda tplCB, tplCT: tplCB[0] == round(tplCT[0]) and \
-                                              tplCB[1] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER == round(tplCT[1]),
-
-                    90: lambda tplCB, tplCT: tplCB[1] == round(tplCT[1]) and \
-                                              tplCB[0] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER == round(tplCT[0]),
-
-                    270: lambda tplCB, tplCT: tplCB[1] == round(tplCT[1]) and \
-                                              tplCB[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER == round(tplCT[0]),
-
-                    45:  lambda tplCB, tplCT: abs((tplCB[0] - tplCT[0]) - (tplCB[1] - tplCT[1])) < 2,
-                    135: lambda tplCB, tplCT: abs((tplCB[0] - tplCT[0]) + (tplCB[1] - tplCT[1])) < 2,
-                    225: lambda tplCB, tplCT: abs((tplCB[0] - tplCT[0]) - (tplCB[1] - tplCT[1])) < 2,
-                    315: lambda tplCB, tplCT: abs((tplCB[0] - tplCT[0]) + (tplCB[1] - tplCT[1])) < 2
-
-                }
-
-                if self.dblRotation in switch_ValidateCenterRot and \
-                        not switch_ValidateCenterRot[self.dblRotation](self.rect.center, tplCenterRot):
-                    raise Exception(f"Center of rotation calc is off bro.\n"
-                                    f"Current rotation: {self.dblRotation}\n"
-                                    f"Current center: {self.rect.center}\n"
-                                    f"Calc'd center of rotation: {tplCenterRot}")
-
                 self._move_angular(lngAngularVel, tplCenterRot, -90)
             else:  # rotate around right track
                 dblRadians = math.radians(self.dblRotation - 90)
                 tplCenterRot = (  # center of right track
-                    self.rect.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
-                    self.rect.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
+                    self.dblRect.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
+                    self.dblRect.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
                 )
                 self._move_angular(lngAngularVel, tplCenterRot, 90)
 
     def _move_linear(self, lngVel):
         dblRotRadians = math.radians(self.dblRotation)
-        dblX = math.cos(dblRotRadians) * float(lngVel)
-        dblY = math.sin(dblRotRadians) * float(lngVel) * -1
-        lngX = int(dblX)
-        lngY = int(dblY)
-        self._move_linear_remainder_x += dblX - lngX
-        self._move_linear_remainder_y += dblY - lngY
-
-        # if we constantly round down, some smaller angles won't ever actually affect the movement
-        if self._move_linear_remainder_x > 1:
-            self._move_linear_remainder_x -= 1.0
-            lngX += 1
-        elif self._move_linear_remainder_x < -1:
-            self._move_linear_remainder_x += 1.0
-            lngX -= 1
-
-        if self._move_linear_remainder_y > 1:
-            self._move_linear_remainder_y -= 1.0
-            lngY += 1
-        elif self._move_linear_remainder_y < -1:
-            self._move_linear_remainder_y += 1.0
-            lngY -= 1
-
-        self.rect.move_ip(lngX, lngY)
+        self.dblRect.left += math.cos(dblRotRadians) * float(lngVel)
+        self.dblRect.top += math.sin(dblRotRadians) * float(lngVel) * -1
 
         # If we drive into the wall at an angle, let's pretend it's fine to "slide" along
         # TODO probly don't do this though
         # TODO also make this smarter and calc properly based on rotation
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > const.ARENA_WIDTH:
-            self.rect.right = const.ARENA_WIDTH
-        if self.rect.top <= 0:
-            self.rect.top = 0
-        if self.rect.bottom >= const.ARENA_HEIGHT:
-            self.rect.bottom = const.ARENA_HEIGHT
+        if self.dblRect.left < 0:
+            self.dblRect.left = 0
+        if self.dblRect.right > const.ARENA_WIDTH:
+            self.dblRect.right = const.ARENA_WIDTH
+        if self.dblRect.top <= 0:
+            self.dblRect.top = 0
+        if self.dblRect.bottom >= const.ARENA_HEIGHT:
+            self.dblRect.bottom = const.ARENA_HEIGHT
 
-    def _debug_rotatecenterarena(self, blnClockwise):
-        tplCenterArena = (const.ARENA_WIDTH / 2, const.ARENA_HEIGHT / 2)
-        lngRotRadius = 16
-        if blnClockwise:
-            self.dblRotation -= 1
-            dblRobotFacing = -90
-        else:
-            self.dblRotation += 1
-            dblRobotFacing = 90
+        self.rect.center = self.dblRect.center
 
-        # Calculate new center
-        dblRadians = math.radians(self.dblRotation)
-        tplNewCenter = (
-            tplCenterArena[0] + lngRotRadius * math.cos(dblRadians),
-            tplCenterArena[1] - lngRotRadius * math.sin(dblRadians)
-        )
-
-        # first, rotate in place
-        self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset + dblRobotFacing)
-        self.rect = self.surf.get_rect(center=tplNewCenter)
-
-    sbln_MoveAngularRoundUp = False
-    # TODO probly want to redo this with quaternions, if possible
-    def _move_angular(self, lngAngularVel, tplCenterRot, dblTrackToCenterAngleAdj):
-        self.dblRotation += lngAngularVel
+    def _move_angular(self, dblAngularVel:float, tplCenterRot:Tuple[float,float]=None, dblTrackToCenterAngleAdj:float=0):
+        self.dblRotation += dblAngularVel
         self.dblRotation %= 360
         if self.dblRotation < 0:
             self.dblRotation += 360
 
-        if tplCenterRot == self.rect.center:
-            tplNewCenter = tplCenterRot
-        else:
+        if tplCenterRot:  # We're not rotating in place. Adjust rect center accordingly.
             dblRadians = math.radians(self.dblRotation + dblTrackToCenterAngleAdj)
-
-            dblNewCenterX = tplCenterRot[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians)
-            dblNewCenterY = tplCenterRot[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
-            lngNewCenterX = int(dblNewCenterX)
-            lngNewCenterY = int(dblNewCenterY)
-
-            # Alternate rounding up and down so we don't accumulate up/left shifts
-            if self._move_angular_roundup_toggle:
-                self._move_angular_roundup_toggle = False
-                lngNewCenterX += 1
-                lngNewCenterY += 1
-            else:
-                self._move_angular_roundup_toggle = True
-
-            # # Remainder approach - something is wrong with this, though
-            # self._move_angular_remainder_x = dblNewCenterX - lngNewCenterX
-            # self._move_angular_remainder_y = dblNewCenterY - lngNewCenterY
-
-            # if we constantly round down, center of mass will shift up/left each rotation
-            # if self._move_angular_remainder_x > 1:
-            #     self._move_angular_remainder_x -= 1.0
-            #     lngNewCenterX += 1
-            # elif self._move_angular_remainder_x < -1:
-            #     self._move_angular_remainder_x += 1.0
-            #     lngNewCenterX -= 1
-            #
-            # if self._move_angular_remainder_y > 1:
-            #     self._move_angular_remainder_y -= 1.0
-            #     lngNewCenterY += 1
-            # elif self._move_angular_remainder_y < -1:
-            #     self._move_angular_remainder_y += 1.0
-            #     lngNewCenterY -= 1
-
-            tplNewCenter = (lngNewCenterX, lngNewCenterY)
+            self.dblRect.centerx = tplCenterRot[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians)
+            self.dblRect.centery = tplCenterRot[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
 
         self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
-        self.rect = self.surf.get_rect(center=tplNewCenter)
-        # self.rect = self.surf.get_rect(center=self.rect.center)
+        self.rect = self.surf.get_rect(center=self.dblRect.center)
+        # rect width/height has changed due to the rotation - reset on dblRect
+        self.dblRect.width = self.rect.width
+        self.dblRect.height = self.rect.height
 
         # If we rotate into the wall... fuck it, just pop ourselves out for now
         # TODO probly don't actually do this though
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > const.ARENA_WIDTH:
-            self.rect.right = const.ARENA_WIDTH
-        if self.rect.top <= 0:
-            self.rect.top = 0
-        if self.rect.bottom >= const.ARENA_HEIGHT:
-            self.rect.bottom = const.ARENA_HEIGHT
+        if self.dblRect.left < 0:
+            self.dblRect.left = 0
+        if self.dblRect.right > const.ARENA_WIDTH:
+            self.dblRect.right = const.ARENA_WIDTH
+        if self.dblRect.top <= 0:
+            self.dblRect.top = 0
+        if self.dblRect.bottom >= const.ARENA_HEIGHT:
+            self.dblRect.bottom = const.ARENA_HEIGHT
+
+        self.rect.center = self.dblRect.center
