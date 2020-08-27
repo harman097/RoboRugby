@@ -47,3 +47,6 @@ class Ball(pygame.sprite.Sprite):
     def set_velocity(self, dblXVelocity, dblYVelocity):
         self.dblXVelocity = dblXVelocity
         self.dblYVelocity = dblYVelocity
+
+    def is_positive(self):
+        return self.tplColor == const.COLOR_BALL_POS

@@ -76,6 +76,12 @@ class Robot(pygame.sprite.Sprite):
         self._move_internal(1)
         self.lngMoveSpeedRem -= 1
 
+    def undo_move(self):
+        self.lngMoveSpeedRem = self.lngMoveSpeed
+        self.rect.left = self.rectPrior.left
+        self.rect.top = self.rectPrior.top
+        self.dblRotation = self.dblRotationPrior
+
     def _move_internal(self, lngSpeed):
 
         if self.lngLThrust == self.lngRThrust:  # Linear travel
