@@ -1,39 +1,42 @@
 import pygame
 import RR_Constants as const
+from RR_Robot import Robot
+from RR_Ball import Ball
+from RR_Goal import Goal
 
-# def check_collision(spr1, spr2):
-#     if isinstance(spr1, Ball):
-#         if isinstance(spr2, Ball):
-#         elif isinstance(spr2, Robot):
-#         elif isinstance(spr2, Goal):
-#         else:
-#             raise Exception("Unknown object: " & type(spr2).__name__)
-#     elif isinstance(spr1, Robot):
-#     elif isinstance(spr1, Goal):
-#     else:
-#         raise Exception("Unknown object: " & type(spr1).__name__)
-#     print("stuff")
-#
-# def resolve_collision(spr1, spr2):
-#     print("stuff")
-def __init__(self):
-    raise Exception("Dont instantiate this. Actually, this should be in a separate file.")
-
-def check_robot_robot_collision(sprRobot1, sprRobot2):
+def check_robot_robot_collision(sprRobot1: Robot, sprRobot2: Robot) -> bool:
     # TODO account for rotation here
     return pygame.sprite.collide_rect(sprRobot1, sprRobot2)
 
-def resolve_robot_robot_collision(sprRobot1, sprRobot2):
-    raise NotImplementedError("jlskdj")
+def resolve_robot_robot_collision(sprRobot1: Robot, sprRobot2: Robot) -> None:
+    # not a super elegant way of doing this but... its the easiest!
+    sprRobot1.undo_move()
+    sprRobot2.undo_move()
 
-def check_ball_robot_collision(sprBall, sprRobot):
+    # Smash them again!
+    lngSmashCount = 0
+    while not check_robot_robot_collision(sprRobot1, sprRobot2):
+        lngSmashCount += 1
+        sprRobot1.move_one()
+        sprRobot2.move_one()
+        if sprRobot1.lngMoveSpeedRem == 0 or sprRobot2.lngMoveSpeedRem == 0:
+            return  # theoretically possible due to rounding differences
+
+    # Once more! but don't full smash!
+    sprRobot1.undo_move()
+    sprRobot2.undo_move()
+    for _ in range(lngSmashCount):
+        sprRobot1.move_one()
+        sprRobot2.move_one()
+
+def check_ball_robot_collision(sprBall: Ball, sprRobot: Robot) -> bool:
     # TODO account for rotation here
     return pygame.sprite.collide_rect(sprRobot, sprBall)
 
-def resolve_ball_robot_collision(sprBall, sprRobot):
+def resolve_ball_robot_collision(sprBall: Ball, sprRobot: Robot) -> None:
     raise NotImplementedError("jlskdj")
 
-def check_collision_wall(objEntity):
+def check_collision_wall(objEntity) -> bool:
     if isinstance(objEntity, pygame.Rect):
         rect = objEntity
     else:

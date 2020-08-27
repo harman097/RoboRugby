@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function
-
+from typing import List, Dict, Tuple
 import MyUtils
 from MyUtils import Stage
 import gym
@@ -100,17 +100,23 @@ class GameEnv(gym.Env):
         # update the display
         pygame.display.flip()
 
-    def step(self, *lstArgs):
+    def step(self, lstArgs: List[Tuple]):
         if self.game_is_done():
             raise Exception("Game is over. Go home.")
         else:
             self.lngStepCount += 1
 
+        # todo either make a base class or check 'hasattribute'
         Stage("Prep ze robots!")
         for sprRobot in self.lstRobots:
             sprRobot.on_step_begin()
 
+        self.sprHappyGoal.on_step_begin()
+        self.sprGrumpyGoal.on_step_begin()
+
         Stage("Activate robot engines!")
+        if len(lstArgs) > const.NUM_ROBOTS_TOTAL:
+            raise Exception(f"{len(lstArgs)} commands but only {const.NUM_ROBOTS_TOTAL} robots.")
         for i in range(len(lstArgs)):
             self.lstRobots[i].set_thrust(lstArgs[i][0], lstArgs[i][1])
 
@@ -122,8 +128,10 @@ class GameEnv(gym.Env):
         lngNaughtyLoop = 0
         while True:
             lngNaughtyLoop += 1
-            if lngNaughtyLoop > 5:
-                raise Exception("Screw this.")
+            if lngNaughtyLoop > 2:
+                break
+                # TODO figure out why we still hit this
+                # raise Exception("Screw this.")
             blnNaughtyBots = False
             
             for sprRobot1 in self.grpRobots.sprites():
@@ -190,6 +198,22 @@ class GameEnv(gym.Env):
         #
         # Probly stuff this whole thing in a loop with a very low loop limit
 
+        Stage("Flag balls in the goal")
+        self.sprHappyGoal.track_balls(self.grpBalls.sprites())
+        self.sprGrumpyGoal.track_balls(self.grpBalls.sprites())
+
+        Stage("Commit balls to their goal")
+        for sprBall in self.sprGrumpyGoal.update_score():
+            sprBall.kill()
+
+        for sprBall in self.sprHappyGoal.update_score():
+            sprBall.kill()
+
+
+        Stage("Handle any end of step activities")
+        # todo this for everything that has it
+        self.sprHappyGoal.on_step_end()
+        self.sprGrumpyGoal.on_step_end()
 
         return self._get_game_state(), self._get_reward(), self.game_is_done(), self._get_debug_info()
 
@@ -202,7 +226,9 @@ class GameEnv(gym.Env):
         return 1
 
     def game_is_done(self):
-        return self.lngStepCount > const.GAME_LENGTH_STEPS
+        return self.lngStepCount > const.GAME_LENGTH_STEPS or \
+               self.sprGrumpyGoal.is_destroyed() or \
+               self.sprHappyGoal.is_destroyed()
 
     def _get_debug_info(self):
         # currently no need for this, but something will probly come up
