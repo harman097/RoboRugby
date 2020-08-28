@@ -55,9 +55,26 @@ while blnRunGame:
             lngLThrust += 1
             lngRThrust -= 1
 
-        lstInput = [(lngLThrust, lngRThrust), (1,0), (1,-1)]
-        for _ in range(3, const.NUM_ROBOTS_HAPPY + const.NUM_ROBOTS_GRUMPY):
-            lstInput.append((random.randint(-1,1), random.randint(-1,1)))
+        lstInput = [(lngLThrust, lngRThrust)]
+        for _ in range(1, const.NUM_ROBOTS_HAPPY + const.NUM_ROBOTS_GRUMPY):
+            rando = random.random()
+            action = (0,0)
+            # ~5% chance to turn left or right, 45% chance to go forward/back
+            if rando <= 0.05:
+                # turn left
+                action = (-1,1)
+            elif rando <= 0.5:
+                # go straight
+                action = (1,1)
+            elif rando < 0.95:
+                # go back
+                action = (-1,-1)
+            else:
+                # turn right
+                action = (1,-1)
+
+            # (random.randint(-1,1), random.randint(-1,1))
+            lstInput.append(action)
 
         env.step(lstInput)
     else:

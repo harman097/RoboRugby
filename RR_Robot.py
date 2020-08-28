@@ -15,6 +15,7 @@ class Robot(pygame.sprite.Sprite):
     ssurfGrumpyRobot.set_colorkey((0, 0, 0), pygame.RLEACCEL)
     slngGrumpyRobotInitialRot = 90
 
+
     # Keep history for: 1s * fps * moves/frame
     _slngMoveHistorySize = 1 * const.FRAMERATE * const.MOVES_PER_FRAME
 
@@ -32,9 +33,9 @@ class Robot(pygame.sprite.Sprite):
             self.dblRotationPrior = Robot.slngHappyRobotInitialRot
             self.dblInitialImageOffset = Robot.slngHappyRobotInitialRot
             self.rect = self.surf.get_rect(
-                center=(  # Happy team starts in the bottom
-                    random.randint(const.ROBOT_WIDTH/2, const.ARENA_WIDTH - const.ROBOT_WIDTH/2),
-                    random.randint(const.ARENA_HEIGHT/2 + const.ROBOT_LENGTH/2, const.ARENA_HEIGHT - const.ROBOT_LENGTH/2)
+                center=(  # Happy team starts in the bottom-right quad with 2-robots padding
+                    random.randint(const.ARENA_WIDTH/2 + const.ROBOT_WIDTH*2, const.ARENA_WIDTH - const.ROBOT_WIDTH*2),
+                    random.randint(const.ARENA_HEIGHT/2 + const.ROBOT_LENGTH*2, const.ARENA_HEIGHT - const.ROBOT_LENGTH*2)
                 )
             )
         else:
@@ -44,9 +45,9 @@ class Robot(pygame.sprite.Sprite):
             self.dblRotationPrior = Robot.slngGrumpyRobotInitialRot
             self.dblInitialImageOffset = Robot.slngGrumpyRobotInitialRot
             self.rect = self.surf.get_rect(
-                center=(  # Grumpy team starts in the top
-                    random.randint(const.ROBOT_WIDTH/2, const.ARENA_WIDTH - const.ROBOT_WIDTH/2),
-                    random.randint(const.ROBOT_LENGTH/2, const.ARENA_HEIGHT/2 - const.ROBOT_LENGTH/2)
+                center=(  # Grumpy team starts in the top-left quad with 2-robots padding
+                    random.randint(const.ROBOT_WIDTH*2, const.ARENA_WIDTH/2 - const.ROBOT_WIDTH*2),
+                    random.randint(const.ROBOT_LENGTH*2, const.ARENA_HEIGHT/2 - const.ROBOT_LENGTH*2)
                 )
             )
 
