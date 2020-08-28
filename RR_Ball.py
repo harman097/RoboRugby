@@ -60,6 +60,10 @@ class Ball(pygame.sprite.Sprite):
 
         self.dblXVelocity *= const.BALL_SLOWDOWN
         self.dblYVelocity *= const.BALL_SLOWDOWN
+        if abs(self.dblXVelocity) < const.BALL_MIN_SPEED:
+            self.dblXVelocity = 0
+        if abs(self.dblYVelocity) < const.BALL_MIN_SPEED:
+            self.dblYVelocity = 0
 
     def set_velocity(self, dblXVelocity, dblYVelocity):
         self.dblXVelocity = dblXVelocity
