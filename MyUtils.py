@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 from typing import Tuple
+from collections import namedtuple
 
 PRINT_STAGE = True
 
@@ -21,6 +22,8 @@ def Div0(pdblNumerator: float, pdblDenominator: float) -> float:
     else:
         raise ZeroDivisionError("Numerator AND Denominator are both 0.")
 
+Point = namedtuple('Point', ['x', 'y'])
+Vect2D = namedtuple('Vect2D', ['x', 'y'])
 
 # pygame rects are just ints, unfortunately, which makes any physics difficult
 class FloatRect:
