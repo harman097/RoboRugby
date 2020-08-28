@@ -19,8 +19,9 @@ import RR_TrashyPhysics as TrashyPhysics
 MyUtils.PRINT_STAGE = False  # Disable stage spam
 
 # TODO perf stuff (if we end up doing serious training with this)
-# (1) Pre-cache sin/cos results in a dictionary when initializing
+# (1) Pre-cache sin/cos results in a dictionary when initializing -or- quaternions? (they're a thing, idk the math tho)
 # Avoid math.sin/cos and radian->degree conversion (cuz it's probly slow?)
+# (2) Can avoid pygame.transform.rotate calls entirely if we're not rendering (I'm assuming it's slow)
 
 # TODO properly inherit
 class GameEnv(gym.Env):

@@ -4,7 +4,7 @@ import math
 import random
 from enum import Enum
 import RR_Constants as const
-from MyUtils import FloatRect
+from MyUtils import FloatRect, Point, Vect2D
 
 class Robot(pygame.sprite.Sprite):
 
@@ -19,6 +19,25 @@ class Robot(pygame.sprite.Sprite):
     # Keep history for: 1s * fps * moves/frame
     _slngMoveHistorySize = 1 * const.FRAMERATE * const.MOVES_PER_FRAME
 
+    @property
+    def dblRotation(self) -> float:
+        return self._dblRotation
+
+    @dblRotation.setter
+    def dblRotation(self, dblNewRotation: float):
+        self._dblRotation = dblNewRotation % 360
+        if self._dblRotation < 0:
+            self._dblRotation += 360
+        self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
+        self.rect = self.surf.get_rect()
+
+        # todo Recalculate corners and collision triangles
+
+        # rect width/height has changed due to the rotation - reset on dblRect
+        # todo do this after recalcing corners instead of using int rect
+        self.dblRect.width = self.rect.width
+        self.dblRect.height = self.rect.height
+
     def __init__(self, intTeam):
         super(Robot, self).__init__()
 
@@ -29,8 +48,7 @@ class Robot(pygame.sprite.Sprite):
         if intTeam == const.TEAM_HAPPY:
             self.surfBase = Robot.ssurfHappyRobot
             self.surf = self.surfBase.copy()
-            self.dblRotation = Robot.slngHappyRobotInitialRot
-            self.dblRotationPrior = Robot.slngHappyRobotInitialRot
+            self._dblRotation = Robot.slngHappyRobotInitialRot
             self.dblInitialImageOffset = Robot.slngHappyRobotInitialRot
             self.rect = self.surf.get_rect(
                 center=(  # Happy team starts in the bottom-right quad with 2-robots padding
@@ -41,8 +59,7 @@ class Robot(pygame.sprite.Sprite):
         else:
             self.surfBase = Robot.ssurfGrumpyRobot
             self.surf = self.surfBase.copy()
-            self.dblRotation = Robot.slngGrumpyRobotInitialRot
-            self.dblRotationPrior = Robot.slngGrumpyRobotInitialRot
+            self._dblRotation = Robot.slngGrumpyRobotInitialRot
             self.dblInitialImageOffset = Robot.slngGrumpyRobotInitialRot
             self.rect = self.surf.get_rect(
                 center=(  # Grumpy team starts in the top-left quad with 2-robots padding
@@ -72,7 +89,6 @@ class Robot(pygame.sprite.Sprite):
 
     def on_step_begin(self):
         self.dblRectPrior = self.dblRect.copy()
-        self.dblRotationPrior = self.dblRotation
 
     def on_step_end(self):
         self.rect.center = self.dblRect.center
@@ -84,10 +100,38 @@ class Robot(pygame.sprite.Sprite):
         BACK_RIGHT=4
 
     def corner(self, enmCorner: 'Robot.Corner') -> Tuple[float,float]:
-        if enmCorner == Robot.Corner.FRONT_LEFT:
-            return (
+        dblAdj_Radians = math.radians(self.dblRotation)
+        dblCos = math.cos(dblAdj_Radians)
+        dblSin = math.sin(dblAdj_Radians)
 
-            )
+        # Get vector from center to corner when rotation is 0
+        if enmCorner == Robot.Corner.FRONT_LEFT:
+            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / 2, y=const.ROBOT_WIDTH / -2)
+        elif enmCorner == Robot.Corner.BACK_LEFT:
+            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / -2, y=const.ROBOT_WIDTH / -2)
+        elif enmCorner == Robot.Corner.FRONT_RIGHT:
+            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / 2, y=const.ROBOT_WIDTH / 2)
+        elif enmCorner == Robot.Corner.BACK_RIGHT:
+            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / -2, y=const.ROBOT_WIDTH / -2)
+        else:
+            raise Exception(f"Unknown corner type: {enmCorner}")
+
+        # Rotate that vector based on current rotation
+        # Rotation matrix on a normal graph is:
+        #   [(cos, -sin),
+        #    (sin,  cos)]
+        # But our y-axis is flipped so the sin components get flipped:
+        #   [( cos, sin),
+        #    (-sin, cos)]
+        tplVectRotated = Vect2D(
+            x = tplVectInitial.x * dblCos + tplVectInitial.y * dblSin,
+            y= -1 * tplVectInitial.x * dblSin - tplVectInitial.y * dblCos
+        )
+
+        # offset from center
+        return Point(x=self.dblRect.centerx + tplVectRotated.x,
+                     y=self.dblRect.centery + tplVectRotated.y)
+
 
     """
     MOVEMENT
@@ -116,15 +160,10 @@ class Robot(pygame.sprite.Sprite):
 
         if dblRot != self.dblRotation:
             self.dblRotation = dblRot
-            self.surf = pygame.transform.rotate(self.surfBase, dblRot - self.dblInitialImageOffset)
-            self.rect = self.surf.get_rect()
-            self.dblRect = FloatRect(dblLeft, dblLeft + self.rect.width,
-                                     dblTop, dblTop + self.rect.height)
-            self.rect.center = self.dblRect.center
-        else:
-            self.dblRect.left = dblLeft
-            self.dblRect.top = dblTop
-            self.rect.center = self.dblRect.center
+
+        self.dblRect = FloatRect(dblLeft, dblLeft + self.rect.width,
+                                 dblTop, dblTop + self.rect.height)
+        self.rect.center = self.dblRect.center
 
         return True
 
@@ -191,9 +230,6 @@ class Robot(pygame.sprite.Sprite):
 
     def _move_angular(self, dblAngularVel:float, tplCenterRot:Tuple[float,float]=None, dblTrackToCenterAngleAdj:float=0):
         self.dblRotation += dblAngularVel
-        self.dblRotation %= 360
-        if self.dblRotation < 0:
-            self.dblRotation += 360
 
         if tplCenterRot:  # We're not rotating in place. Adjust rect center accordingly.
             dblRadians = math.radians(self.dblRotation + dblTrackToCenterAngleAdj)
@@ -202,9 +238,6 @@ class Robot(pygame.sprite.Sprite):
 
         self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
         self.rect = self.surf.get_rect(center=self.dblRect.center)
-        # rect width/height has changed due to the rotation - reset on dblRect
-        self.dblRect.width = self.rect.width
-        self.dblRect.height = self.rect.height
 
         # If we rotate into the wall... fuck it, just pop ourselves out for now
         # TODO probly don't actually do this though
