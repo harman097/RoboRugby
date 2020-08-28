@@ -2,6 +2,7 @@ import pygame
 from typing import Tuple, Dict, List
 import math
 import random
+from enum import Enum
 import RR_Constants as const
 from MyUtils import FloatRect
 
@@ -14,20 +15,15 @@ class Robot(pygame.sprite.Sprite):
     ssurfGrumpyRobot.set_colorkey((0, 0, 0), pygame.RLEACCEL)
     slngGrumpyRobotInitialRot = 90
 
+    # Keep history for: 1s * fps * moves/frame
+    _slngMoveHistorySize = 1 * const.FRAMERATE * const.MOVES_PER_FRAME
+
     def __init__(self, intTeam):
         super(Robot, self).__init__()
 
         self.intTeam = intTeam
         self.lngLThrust = 0
         self.lngRThrust = 0
-        self.lngMoveSpeed = const.ROBOT_VEL
-        self.lngMoveSpeedRem = 0
-        self._move_linear_remainder_x = 0.0
-        self._move_linear_remainder_y = 0.0
-        # self._move_angular_remainder_x = 0.0
-        # self._move_angular_remainder_y = 0.0
-        # This works better than the remainder approach (aka i fucked something up with the latter)
-        self._move_angular_roundup_toggle = False
 
         if intTeam == const.TEAM_HAPPY:
             self.surfBase = Robot.ssurfHappyRobot
@@ -58,42 +54,78 @@ class Robot(pygame.sprite.Sprite):
         self.dblRect = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
         self.dblRectPrior = self.dblRect.copy()
 
+        self.lngMoveCount = 0
+        self._lstStates = [None]*self._slngMoveHistorySize # type: List[Tuple[float, float, float, int]]
+
+    def _store_state(self):
+        self._lstStates[self.lngMoveCount % self._slngMoveHistorySize] = (
+            self.dblRect.left,
+            self.dblRect.top,
+            self.dblRotation,
+            self.lngMoveCount
+        )
+
     def set_thrust(self, lngLThrust, lngRThrust):
         self.lngLThrust = lngLThrust
         self.lngRThrust = lngRThrust
 
     def on_step_begin(self):
-        self.lngMoveSpeedRem = self.lngMoveSpeed
         self.dblRectPrior = self.dblRect.copy()
         self.dblRotationPrior = self.dblRotation
 
     def on_step_end(self):
         self.rect.center = self.dblRect.center
 
-    def move_all(self):
-        if self.lngMoveSpeedRem <= 0:
-            return False
+    class Corner(Enum):
+        FRONT_LEFT=1
+        FRONT_RIGHT=2
+        BACK_LEFT=3
+        BACK_RIGHT=4
 
-        self._move_internal(self.lngMoveSpeedRem)
-        self.lngMoveSpeedRem = 0
+    def corner(self, enmCorner: 'Robot.Corner') -> Tuple[float,float]:
+        if enmCorner == Robot.Corner.FRONT_LEFT:
+            return (
 
-    def move_one(self):
-        if self.lngMoveSpeedRem <= 0:
-            return False
+            )
 
+    """
+    MOVEMENT
+    """
+
+    def move(self):
+        self.lngMoveCount += 1
         self._move_internal(1)
-        self.lngMoveSpeedRem -= 1
+        self._store_state()
 
-    def undo_move(self):
-        self.lngMoveSpeedRem = self.lngMoveSpeed
-        self.dblRect = self.dblRectPrior.copy()
+    def undo_move(self) -> bool:
+        if self._try_restore_state(self.lngMoveCount - 1):
+            self.lngMoveCount -= 1
+            return True
+        return False
 
-        if self.dblRotation != self.dblRotationPrior:
-            self.dblRotation = self.dblRotationPrior
-            self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
-            self.rect = self.surf.get_rect(center=self.dblRect.center)
-        else:
+    def _try_restore_state(self, lngMoveCount: int) -> bool:
+        intI = lngMoveCount % self._slngMoveHistorySize
+        if not self._lstStates[intI]:
+            return False
+
+        # unpack tuple
+        dblLeft, dblTop, dblRot, lngMC = self._lstStates[intI]
+        if lngMC != lngMoveCount:  # state was overwritten
+            return False
+
+        if dblRot != self.dblRotation:
+            self.dblRotation = dblRot
+            self.surf = pygame.transform.rotate(self.surfBase, dblRot - self.dblInitialImageOffset)
+            self.rect = self.surf.get_rect()
+            self.dblRect = FloatRect(dblLeft, dblLeft + self.rect.width,
+                                     dblTop, dblTop + self.rect.height)
             self.rect.center = self.dblRect.center
+        else:
+            self.dblRect.left = dblLeft
+            self.dblRect.top = dblTop
+            self.rect.center = self.dblRect.center
+
+        return True
 
     def _move_internal(self, lngSpeed):
 
@@ -102,8 +134,7 @@ class Robot(pygame.sprite.Sprite):
                 self._move_linear(lngSpeed * -1)
             elif self.lngLThrust > 0:
                 self._move_linear(lngSpeed)
-            else:  # no thrust, just consume all movement speed
-                self.lngMoveSpeedRem = 0
+            else:  # no thrust
                 return
 
         elif self.lngLThrust + self.lngRThrust == 0:  # Spin in-place

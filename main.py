@@ -55,8 +55,8 @@ while blnRunGame:
             lngLThrust += 1
             lngRThrust -= 1
 
-        lstInput = [(lngLThrust, lngRThrust)]
-        for _ in range(1, const.NUM_ROBOTS_HAPPY + const.NUM_ROBOTS_GRUMPY):
+        lstInput = [(lngLThrust, lngRThrust), (1,0), (1,-1)]
+        for _ in range(3, const.NUM_ROBOTS_HAPPY + const.NUM_ROBOTS_GRUMPY):
             lstInput.append((random.randint(-1,1), random.randint(-1,1)))
 
         env.step(lstInput)
