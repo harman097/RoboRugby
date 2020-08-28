@@ -5,6 +5,7 @@ from MyUtils import Stage
 import gym
 import pygame
 import RR_Constants as const
+from enum import Enum
 
 Stage("Initialize pygame")
 pygame.init()
@@ -27,6 +28,14 @@ class GameEnv(gym.Env):
         Stage("Initializing RoboRugby...")
         self.grpAllSprites = pygame.sprite.Group()
         self.lngStepCount = 0
+
+        # left wall, right wall, top wall, bottom wall - 100 px buffer
+        self.lstWalls = [
+            pygame.Rect(-100, -100, 100, const.ARENA_HEIGHT + 200),
+            pygame.Rect(const.ARENA_WIDTH, -100, 100, const.ARENA_HEIGHT + 200),
+            pygame.Rect(-100, -100, const.ARENA_WIDTH + 200, 100),
+            pygame.Rect(const.ARENA_HEIGHT, -100, const.ARENA_WIDTH + 200, 100)
+        ]
 
         # TODO set these properly (if you want to properly implement gym.Env)
         # self.action_space = gym.spaces.Tuple()? .MultiDiscrete()
@@ -106,13 +115,10 @@ class GameEnv(gym.Env):
         else:
             self.lngStepCount += 1
 
-        # todo either make a base class or check 'hasattribute'
-        Stage("Prep ze robots!")
-        for sprRobot in self.lstRobots:
-            sprRobot.on_step_begin()
-
-        self.sprHappyGoal.on_step_begin()
-        self.sprGrumpyGoal.on_step_begin()
+        Stage("Prep ze sprites!")
+        for sprSprite in self.grpAllSprites:
+            if hasattr(sprSprite, 'on_step_begin'):
+                sprSprite.on_step_begin()
 
         Stage("Activate robot engines!")
         if len(lstArgs) > const.NUM_ROBOTS_TOTAL:
@@ -120,105 +126,85 @@ class GameEnv(gym.Env):
         for i in range(len(lstArgs)):
             self.lstRobots[i].set_thrust(lstArgs[i][0], lstArgs[i][1])
 
-        Stage("Move those robots!")
-        for sprRobot in self.grpRobots.sprites():
-            sprRobot.move_all()
+        """
+        New pseudo, now that move_one() is viable
+        For _ in range(const.ROBOT_SPEED) (aka pixels to move per frame)
+            robots.move_one()
+            for each robot/robot collision
+                undo both of their latest moves
+                set movement speed to 0
+            for each robot/ball collision
+                impart velocity to the ball
+            balls.move_one()
+            for each ball/ball collision
+                bounce balls off each other
+            for each robot/ball collision
+                undo the robot movement (it hit the wall or another robot)        
+        """
 
-        Stage("Did they smash each other?")
-        lngNaughtyLoop = 0
-        while True:
-            lngNaughtyLoop += 1
-            if lngNaughtyLoop > 2:
-                # break
-                # TODO figure out why we still hit this
-                raise Exception("Screw this.")
-            blnNaughtyBots = False
-            
-            for sprRobot1 in self.grpRobots.sprites():
-                for sprRobot2 in pygame.sprite.spritecollide(sprRobot1, self.grpRobots, False, collided=TrashyPhysics.robots_collided):
-                    # TODO deduct some points here but... who gets deducted? "who smashed who" should matter...
-                    if not sprRobot1 is sprRobot2:
-                        blnNaughtyBots = True
-                        TrashyPhysics.resolve_robot_robot_collision(sprRobot1, sprRobot2)
-                        
-            if not blnNaughtyBots:
-                break                
+        for _ in range(const.MOVES_PER_FRAME):
 
-        Stage("Let the balls roll around")
-        for sprBall in self.grpBalls.sprites():
-            sprBall.move()
+            # Typehint all the loop variables we're going to use
+            # so Pycharm will make our lives easier
+            sprRobot: Robot
+            sprRobot1: Robot
+            sprRobot2: Robot
+            sprBall: Ball
+            sprBall1: Ball
+            sprBall2: Ball
 
-        Stage("Push those balls! like with a robot")
-        for sprBall in self.grpBalls.sprites():
-            lstCollisions = pygame.sprite.spritecollide(sprBall, self.grpRobots, False, collided=TrashyPhysics.check_ball_robot_collision)
-            if len(lstCollisions) > 1 or \
-                    (len(lstCollisions) == 1 and TrashyPhysics.check_collision_wall(sprBall)):
-                # robots are smashing into same ball (without smashing each other) -or-
-                # robot is smashing ball into wall
-                raise NotImplementedError("Back the robots up, man!")
+            Stage("Move those robots!")
+            for sprRobot in self.grpRobots.sprites():
+                sprRobot.move()
 
-            elif len(lstCollisions) == 1:  # just push the ball
-                objRobot = lstCollisions[0]
+            Stage("Did they smash each other?")
+            for sprRobot1, sprRobot2 in TrashyPhysics.collision_pairs_self(
+                    self.grpRobots, fncCollided=TrashyPhysics.robots_collided):
+                # TODO deduct some points here but... who gets deducted? "who smashed who" should matter...
+                lngNaughtyLoop = 0
+                while True:
+                    lngNaughtyLoop += 1
+                    sprRobot1.undo_move()
+                    sprRobot2.undo_move()
+                    if not TrashyPhysics.robots_collided(sprRobot1, sprRobot2):
+                        break
+                    elif lngNaughtyLoop > 1000:
+                        raise Exception("Dude this is seriously broken")
 
-                # TODO pick this up here
+            Stage("Push those balls!")
+            for sprBall, sprRobot in TrashyPhysics.collision_pairs(
+                    self.grpBalls, self.grpRobots, fncCollided=TrashyPhysics.ball_robot_collided):
+                TrashyPhysics.apply_force_to_ball(sprRobot, sprBall)
 
-                # Determine the vector the robot has actually traveled (don't trust thrust)
+            Stage("Roll the balls!")
+            for sprBall in self.grpBalls.sprites():
+                sprBall.move()
 
-                # Trashy trash solely so it's interesting, for the moment
-                dblDeltaX = objRobot.dblRect.centerx - objRobot.dblRectPrior.centerx
-                dblDeltaY = objRobot.dblRect.centery - objRobot.dblRectPrior.centery
+            Stage("Bounce the balls!")
+            for sprBall1, sprBall2 in TrashyPhysics.collision_pairs_self(
+                    self.grpBalls, fncCollided=TrashyPhysics.balls_collided):
+                TrashyPhysics.bounce_balls(sprBall1, sprBall2)
 
-                if dblDeltaX > 0:
-                    sprBall.dblXVelocity = max(dblDeltaX, sprBall.dblXVelocity)
-                else:
-                    sprBall.dblXVelocity = min(dblDeltaX, sprBall.dblXVelocity)
-
-                if dblDeltaY > 0:
-                    sprBall.dblYVelocity = max(dblDeltaY, sprBall.dblYVelocity)
-                else:
-                    sprBall.dblYVelocity = min(dblDeltaY, sprBall.dblYVelocity)
-
-                # TODO this is kind of trash but whatever
-                sprBall.dblRect.left += dblDeltaX
-                sprBall.dblRect.top += dblDeltaY
-                sprBall.rect.left = sprBall.dblRect.left
-                sprBall.rect.top = sprBall.dblRect.top
-
-        # Pseudo "good enough" code
-        # Check for robot-on-ball collision
-        #   Resolve by:
-        #       flag balls being pushed by robots
-        #       assigning velocity based on the robot's velocity (not thrust)
-        #       popping the ball out of the robot (linear should be easy)
-        #       if the ball gets pushed into a wall... just stop the Robot and "disallow" this
-        #           pop the ball out of the wall
-        #           back up the robot along it's vector
-        #       if the ball gets pushed into another ball...
-        #           calc vector from center pusher to center pushee
-        #           don't move the pusher (if it's attached to a robot - unrealistic, but good enough?)
-        #           move the pushee along the vector until it's no longer overlapped
-        # Move balls not being pushed
-        #
-        # Probly stuff this whole thing in a loop with a very low loop limit
+            Stage("Are robots still being naughty? Deny movement.")
+            for sprBall, sprRobot in TrashyPhysics.collision_pairs(
+                    self.grpBalls, self.grpRobots, fncCollided=TrashyPhysics.ball_robot_collided):
+                sprRobot.undo_move()
 
         Stage("Flag balls in the goal")
         self.sprHappyGoal.track_balls(self.grpBalls.sprites())
         self.sprGrumpyGoal.track_balls(self.grpBalls.sprites())
 
-        Stage("Commit balls to their goal")
+        Stage("Commit balls that have scored")
         for sprBall in self.sprGrumpyGoal.update_score():
             sprBall.kill()
 
         for sprBall in self.sprHappyGoal.update_score():
             sprBall.kill()
 
-
         Stage("Handle any end of step activities")
-        # todo this for everything that has it
-        self.sprHappyGoal.on_step_end()
-        self.sprGrumpyGoal.on_step_end()
-        for sprRobot in self.grpRobots.sprites():
-            sprRobot.on_step_end()
+        for sprSprite in self.grpAllSprites:
+            if hasattr(sprSprite, 'on_step_end'):
+                sprSprite.on_step_end()
 
         return self._get_game_state(), self._get_reward(), self.game_is_done(), self._get_debug_info()
 
@@ -239,6 +225,24 @@ class GameEnv(gym.Env):
         # currently no need for this, but something will probly come up
         return None
 
+    # maybeeeeeeeeeeeee this will be usefull but...
+    class Wall(pygame.sprite.Sprite):
+
+        class WallType(Enum):
+            LEFT = 1
+            RIGHT = 2
+            TOP = 3
+            BOTTOM = 4
+
+        def __init__(self, enmType: 'GameEnv.Wall.WallType'):
+            if enmType == GameEnv.Wall.WallType.LEFT:
+                self.rect = pygame.Rect(-100, -100, 100, const.ARENA_HEIGHT + 200)
+            elif enmType == GameEnv.Wall.WallType.RIGHT:
+                self.rect = pygame.Rect(const.ARENA_WIDTH, -100, 100, const.ARENA_HEIGHT + 200)
+            elif enmType == GameEnv.Wall.WallType.TOP:
+                self.rect = pygame.Rect(-100, -100, const.ARENA_WIDTH + 200, 100)
+            elif enmType == GameEnv.Wall.WallType.BOTTOM:
+                self.rect = pygame.Rect(const.ARENA_HEIGHT, -100, const.ARENA_WIDTH + 200, 100)
 
 
 

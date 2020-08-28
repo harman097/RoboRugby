@@ -6,6 +6,7 @@ from MyUtils import FloatRect
 class Ball(pygame.sprite.Sprite):
     def __init__(self, tplColor):
         super(Ball, self).__init__()
+        self.blnHitWall = False
         self.dblXVelocity = 0
         self.dblYVelocity = 0
         self.tplColor = tplColor
@@ -21,14 +22,21 @@ class Ball(pygame.sprite.Sprite):
 
         # integer rect, used by pygame for rendering
         self.rect = self.surf.get_rect(center=tplCenter)
+        self.radius = const.BALL_RADIUS  # used by pygame to check circle collisions
         pygame.draw.circle(self.surf, self.tplColor, (const.BALL_RADIUS, const.BALL_RADIUS), const.BALL_RADIUS)
 
         # actual rect, used internally to calculate location
         self.dblRect = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
         self.dblRectPrior = self.dblRect.copy()
 
-    def move(self):
+    def on_step_begin(self):
         self.dblRectPrior = self.dblRect.copy()
+        self.blnHitWall = False
+
+    def on_step_end(self):
+        print("Ball.on_step_end() not implemented.")
+
+    def move(self):
         self.dblRect.left += self.dblXVelocity
         self.dblRect.top += self.dblYVelocity
 
