@@ -31,8 +31,8 @@ def collided_wall(objEntity) -> bool:
 def apply_force_to_ball(sprRobot: Robot, sprBall: Ball) -> None:
 
         # Trashy trash solely so it's interesting, for the moment
-        dblDeltaX = sprRobot.dblRect.centerx - sprRobot.dblRectPrior.centerx
-        dblDeltaY = sprRobot.dblRect.centery - sprRobot.dblRectPrior.centery
+        dblDeltaX = (sprRobot.dblRect.centerx - sprRobot.dblRectPrior.centerx) * const.PUSH_FACTOR
+        dblDeltaY = (sprRobot.dblRect.centery - sprRobot.dblRectPrior.centery) * const.PUSH_FACTOR
 
         if dblDeltaX > 0:
             sprBall.dblXVelocity = max(dblDeltaX, sprBall.dblXVelocity)
