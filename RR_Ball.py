@@ -34,7 +34,8 @@ class Ball(pygame.sprite.Sprite):
         self.blnHitWall = False
 
     def on_step_end(self):
-        print("Ball.on_step_end() not implemented.")
+        AvoidConsoleSpam = 'Yes'
+        # print("Ball.on_step_end() not implemented.")
 
     def move(self):
         self.dblRect.left += self.dblXVelocity

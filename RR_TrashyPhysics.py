@@ -51,7 +51,8 @@ def apply_force_to_ball(sprRobot: Robot, sprBall: Ball) -> None:
         sprBall.rect.top = sprBall.dblRect.top
 
 def bounce_balls(spr1: Ball, spr2: Ball) -> None:
-    print("TrashyPhysics.bounce_balls() not done.")
+    AvoidConsoleSpam = 'Yes'
+    #print("TrashyPhysics.bounce_balls() not done.")
 
 def collision_pairs_self(grpSprites: pygame.sprite.Group,
                          fncCollided=pygame.sprite.collide_rect) -> List[Tuple[Sprite,Sprite]]:
