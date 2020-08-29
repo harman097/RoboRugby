@@ -2,31 +2,42 @@ import pygame
 import RR_Constants as const
 from typing import List
 from RR_Ball import Ball
-from MyUtils import Div0
+from MyUtils import Div0, RightTriangle, Point
 
 class Goal(pygame.sprite.Sprite):
     def __init__(self, intTeam):
         super(Goal, self).__init__()
         self.intTeam = intTeam
         self.surf = pygame.Surface((const.GOAL_WIDTH, const.GOAL_HEIGHT))
+        self.surf.fill(const.COLOR_BACKGROUND)
+
         if intTeam == const.TEAM_HAPPY:
             self.tplColor = const.COLOR_GOAL_HAPPY
             # Bottom right
-            self.tplCenter = (const.ARENA_WIDTH - const.GOAL_WIDTH/2,
-                              const.ARENA_HEIGHT - const.GOAL_HEIGHT/2)
-            self.lstPoly = [(const.GOAL_WIDTH, 0),
-                            (0, const.GOAL_HEIGHT),
-                            (const.GOAL_WIDTH, const.GOAL_HEIGHT)]
+            self.triShape = RightTriangle(
+                Point(const.ARENA_WIDTH, const.ARENA_HEIGHT),
+                Point(const.ARENA_WIDTH, const.ARENA_HEIGHT - const.GOAL_HEIGHT),
+                Point(const.ARENA_WIDTH - const.GOAL_WIDTH, const.ARENA_HEIGHT))
         else:
             self.tplColor = const.COLOR_GOAL_GRUMPY
-            self.tplCenter = (const.GOAL_WIDTH/2, const.GOAL_HEIGHT/2)
-            self.lstPoly = [(const.GOAL_WIDTH, 0),
-                            (0, const.GOAL_HEIGHT),
-                            (0,0)]
+            # Top left
+            self.triShape = RightTriangle(
+                Point(const.GOAL_WIDTH, 0),
+                Point(0, const.GOAL_HEIGHT),
+                Point(0, 0)
+            )
 
-        self.rect = self.surf.get_rect(center=self.tplCenter)
-        self.surf.fill(const.COLOR_BACKGROUND)
-        pygame.draw.polygon(self.surf, self.tplColor, self.lstPoly)
+        self.rect = self.surf.get_rect(
+            center=(
+                (self.triShape.left + self.triShape.right)/2,
+                (self.triShape.top + self.triShape.bottom)/2
+            )
+        )
+
+        pygame.draw.polygon(
+            self.surf, self.tplColor,
+            list(map(lambda tplI: (tplI[0] - self.triShape.left, tplI[1] - self.triShape.top), self.triShape.corners)))
+
         self.lngFrameCount = 0
         self.dctBallsCurrent = {}
         self.dctBallsPrior = {}
@@ -51,19 +62,7 @@ class Goal(pygame.sprite.Sprite):
                 self.dctBallsCurrent[sprBall] = self.lngFrameCount
 
     def ball_in_goal(self, sprBall: Ball) -> bool:
-        if self.rect.left <= sprBall.rect.centerx <= self.rect.right and \
-                self.rect.top <= sprBall.rect.centery <= self.rect.bottom:
-
-            # is the center of the ball within the triangle?
-            # comparing the slope of the hypotenuse to the slope of the ball will
-            # tell us if it's in the top left or bottom right portion
-            dblSlopeHypotenuse = Div0(self.rect.bottom - self.rect.centery, self.rect.centerx - self.rect.left)
-            dblSlopeBall = Div0(self.rect.bottom - sprBall.rect.centery, sprBall.rect.centerx - self.rect.left)
-
-            if self.intTeam == const.TEAM_HAPPY:
-                return dblSlopeBall <= dblSlopeHypotenuse
-            else:
-                return dblSlopeBall >= dblSlopeHypotenuse
+        return self.triShape.contains_point(sprBall.dblRect.center)
 
     def update_score(self) -> List[Ball]:
         lstConsumedBalls = []
