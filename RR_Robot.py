@@ -4,7 +4,7 @@ import math
 import random
 from enum import Enum
 import RR_Constants as const
-from MyUtils import FloatRect, Point, Vect2D
+from MyUtils import FloatRect, Point
 
 class Robot(pygame.sprite.Sprite):
 
@@ -13,30 +13,46 @@ class Robot(pygame.sprite.Sprite):
     slngHappyRobotInitialRot = 90
     ssurfGrumpyRobot = pygame.image.load("Grumpy_Robot_40x20.png").convert()
     ssurfGrumpyRobot.set_colorkey((0, 0, 0), pygame.RLEACCEL)
-    slngGrumpyRobotInitialRot = 90
-
+    slngGrumpyRobotInitialRot = -90
 
     # Keep history for: 1s * fps * moves/frame
     _slngMoveHistorySize = 1 * const.FRAMERATE * const.MOVES_PER_FRAME
 
     @property
     def dblRotation(self) -> float:
-        return self._dblRotation
+        return self.rectDbl.rotation
 
     @dblRotation.setter
     def dblRotation(self, dblNewRotation: float):
-        self._dblRotation = dblNewRotation % 360
-        if self._dblRotation < 0:
-            self._dblRotation += 360
-        self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
-        self.rect = self.surf.get_rect()
+        self.rectDbl.rotation = dblNewRotation
 
-        # todo Recalculate corners and collision triangles
+    @property
+    def rect(self) -> pygame.Rect:
+        return pygame.Rect(
+            self.rectDbl.left,
+            self.rectDbl.top,
+            self.rectDbl.right - self.rectDbl.left,
+            self.rectDbl.bottom - self.rectDbl.top
+        )
 
-        # rect width/height has changed due to the rotation - reset on dblRect
-        # todo do this after recalcing corners instead of using int rect
-        self.dblRect.width = self.rect.width
-        self.dblRect.height = self.rect.height
+    @property
+    def surf(self):
+        return pygame.transform.rotate(self.surfBase, self.dblRotation)
+        # self.rect = self.surf.get_rect(center=(self.rectDbl.center))
+
+    @property
+    def rectDblPrior(self) -> FloatRect:
+        lngI = (self.lngMoveCount - 1) % Robot._slngMoveHistorySize
+        if self._lstStates[lngI] is None:
+            return self.rectDbl.copy()
+
+        rectPrior = self.rectDbl.copy()
+        rectPrior.centerx, rectPrior.centery, rectPrior.rotation, lngMC = self._lstStates[lngI]
+        if lngMC != self.lngMoveCount - 1:
+            raise Exception(f"How...? {lngMC} != {self.lngMoveCount - 1}")
+
+        return rectPrior
+
 
     def __init__(self, intTeam):
         super(Robot, self).__init__()
@@ -45,40 +61,29 @@ class Robot(pygame.sprite.Sprite):
         self.lngLThrust = 0
         self.lngRThrust = 0
 
+        # self.rect = rendering (integers), self.dblRect = location calc (float)
+        self.rectDbl = FloatRect(0, const.ROBOT_LENGTH, 0, const.ROBOT_WIDTH)
+
         if intTeam == const.TEAM_HAPPY:
             self.surfBase = Robot.ssurfHappyRobot
-            self.surf = self.surfBase.copy()
-            self._dblRotation = Robot.slngHappyRobotInitialRot
-            self.dblInitialImageOffset = Robot.slngHappyRobotInitialRot
-            self.rect = self.surf.get_rect(
-                center=(  # Happy team starts in the bottom-right quad with 2-robots padding
-                    random.randint(const.ARENA_WIDTH/2 + const.ROBOT_WIDTH*2, const.ARENA_WIDTH - const.ROBOT_WIDTH*2),
-                    random.randint(const.ARENA_HEIGHT/2 + const.ROBOT_LENGTH*2, const.ARENA_HEIGHT - const.ROBOT_LENGTH*2)
-                )
-            )
+            # Happy team starts in the bottom-right quad with 2-robots padding
+            self.rectDbl.centerx = random.randint(const.ARENA_WIDTH / 2 + const.ROBOT_WIDTH * 2, const.ARENA_WIDTH - const.ROBOT_WIDTH * 2)
+            self.rectDbl.centery = random.randint(const.ARENA_HEIGHT / 2 + const.ROBOT_LENGTH * 2, const.ARENA_HEIGHT - const.ROBOT_LENGTH * 2)
+            self.rectDbl.rotation = Robot.slngHappyRobotInitialRot
         else:
             self.surfBase = Robot.ssurfGrumpyRobot
-            self.surf = self.surfBase.copy()
-            self._dblRotation = Robot.slngGrumpyRobotInitialRot
-            self.dblInitialImageOffset = Robot.slngGrumpyRobotInitialRot
-            self.rect = self.surf.get_rect(
-                center=(  # Grumpy team starts in the top-left quad with 2-robots padding
-                    random.randint(const.ROBOT_WIDTH*2, const.ARENA_WIDTH/2 - const.ROBOT_WIDTH*2),
-                    random.randint(const.ROBOT_LENGTH*2, const.ARENA_HEIGHT/2 - const.ROBOT_LENGTH*2)
-                )
-            )
-
-        # self.rect = rendering (integers), self.dblRect = location calc (float)
-        self.dblRect = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
-        self.dblRectPrior = self.dblRect.copy()
+            # Grumpy team starts in the top-left quad with 2-robots padding
+            self.rectDbl.centerx = random.randint(const.ROBOT_WIDTH * 2, const.ARENA_WIDTH / 2 - const.ROBOT_WIDTH * 2)
+            self.rectDbl.centery = random.randint(const.ROBOT_LENGTH * 2, const.ARENA_HEIGHT / 2 - const.ROBOT_LENGTH * 2)
+            self.rectDbl.rotation = Robot.slngGrumpyRobotInitialRot
 
         self.lngMoveCount = 0
         self._lstStates = [None]*self._slngMoveHistorySize # type: List[Tuple[float, float, float, int]]
 
     def _store_state(self):
         self._lstStates[self.lngMoveCount % self._slngMoveHistorySize] = (
-            self.dblRect.left,
-            self.dblRect.top,
+            self.rectDbl.centerx,
+            self.rectDbl.centery,
             self.dblRotation,
             self.lngMoveCount
         )
@@ -87,55 +92,7 @@ class Robot(pygame.sprite.Sprite):
         self.lngLThrust = lngLThrust
         self.lngRThrust = lngRThrust
 
-    def on_step_begin(self):
-        self.dblRectPrior = self.dblRect.copy()
-
-    def on_step_end(self):
-        self.rect.center = self.dblRect.center
-
-    class Corner(Enum):
-        FRONT_LEFT=1
-        FRONT_RIGHT=2
-        BACK_LEFT=3
-        BACK_RIGHT=4
-
-    def corner(self, enmCorner: 'Robot.Corner') -> Tuple[float,float]:
-        dblAdj_Radians = math.radians(self.dblRotation)
-        dblCos = math.cos(dblAdj_Radians)
-        dblSin = math.sin(dblAdj_Radians)
-
-        # Get vector from center to corner when rotation is 0
-        if enmCorner == Robot.Corner.FRONT_LEFT:
-            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / 2, y=const.ROBOT_WIDTH / -2)
-        elif enmCorner == Robot.Corner.BACK_LEFT:
-            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / -2, y=const.ROBOT_WIDTH / -2)
-        elif enmCorner == Robot.Corner.FRONT_RIGHT:
-            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / 2, y=const.ROBOT_WIDTH / 2)
-        elif enmCorner == Robot.Corner.BACK_RIGHT:
-            tplVectInitial = Vect2D(x=const.ROBOT_LENGTH / -2, y=const.ROBOT_WIDTH / -2)
-        else:
-            raise Exception(f"Unknown corner type: {enmCorner}")
-
-        # Rotate that vector based on current rotation
-        # Rotation matrix on a normal graph is:
-        #   [(cos, -sin),
-        #    (sin,  cos)]
-        # But our y-axis is flipped so the sin components get flipped:
-        #   [( cos, sin),
-        #    (-sin, cos)]
-        tplVectRotated = Vect2D(
-            x = tplVectInitial.x * dblCos + tplVectInitial.y * dblSin,
-            y= -1 * tplVectInitial.x * dblSin - tplVectInitial.y * dblCos
-        )
-
-        # offset from center
-        return Point(x=self.dblRect.centerx + tplVectRotated.x,
-                     y=self.dblRect.centery + tplVectRotated.y)
-
-
-    """
-    MOVEMENT
-    """
+    #region Movement
 
     def move(self):
         self.lngMoveCount += 1
@@ -153,17 +110,16 @@ class Robot(pygame.sprite.Sprite):
         if not self._lstStates[intI]:
             return False
 
+
         # unpack tuple
-        dblLeft, dblTop, dblRot, lngMC = self._lstStates[intI]
+        dblCx, dblCy, dblRot, lngMC = self._lstStates[intI]
         if lngMC != lngMoveCount:  # state was overwritten
             return False
 
-        if dblRot != self.dblRotation:
-            self.dblRotation = dblRot
-
-        self.dblRect = FloatRect(dblLeft, dblLeft + self.rect.width,
-                                 dblTop, dblTop + self.rect.height)
-        self.rect.center = self.dblRect.center
+        self.rectDbl.centerx = dblCx
+        self.rectDbl.centery = dblCy
+        if dblRot != self.rectDbl.rotation:
+            self.rectDbl.rotation = dblRot
 
         return True
 
@@ -197,57 +153,50 @@ class Robot(pygame.sprite.Sprite):
             if self.lngRThrust != 0:  # rotate around left track
                 dblRadians = math.radians(self.dblRotation + 90)
                 tplCenterRot = (  # center of left track
-                    self.dblRect.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
-                    self.dblRect.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
+                    self.rectDbl.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
+                    self.rectDbl.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
                 )
                 self._move_angular(lngAngularVel, tplCenterRot, -90)
             else:  # rotate around right track
                 dblRadians = math.radians(self.dblRotation - 90)
                 tplCenterRot = (  # center of right track
-                    self.dblRect.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
-                    self.dblRect.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
+                    self.rectDbl.centerx + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians),
+                    self.rectDbl.centery - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
                 )
                 self._move_angular(lngAngularVel, tplCenterRot, 90)
 
     def _move_linear(self, lngVel):
         dblRotRadians = math.radians(self.dblRotation)
-        self.dblRect.left += math.cos(dblRotRadians) * float(lngVel)
-        self.dblRect.top += math.sin(dblRotRadians) * float(lngVel) * -1
+        self.rectDbl.left += math.cos(dblRotRadians) * float(lngVel)
+        self.rectDbl.top += math.sin(dblRotRadians) * float(lngVel) * -1
 
         # If we drive into the wall at an angle, let's pretend it's fine to "slide" along
-        # TODO probly don't do this though
-        # TODO also make this smarter and calc properly based on rotation
-        if self.dblRect.left < 0:
-            self.dblRect.left = 0
-        if self.dblRect.right > const.ARENA_WIDTH:
-            self.dblRect.right = const.ARENA_WIDTH
-        if self.dblRect.top <= 0:
-            self.dblRect.top = 0
-        if self.dblRect.bottom >= const.ARENA_HEIGHT:
-            self.dblRect.bottom = const.ARENA_HEIGHT
-
-        self.rect.center = self.dblRect.center
+        if self.rectDbl.left < 0:
+            self.rectDbl.left = 0
+        if self.rectDbl.right > const.ARENA_WIDTH:
+            self.rectDbl.right = const.ARENA_WIDTH
+        if self.rectDbl.top <= 0:
+            self.rectDbl.top = 0
+        if self.rectDbl.bottom >= const.ARENA_HEIGHT:
+            self.rectDbl.bottom = const.ARENA_HEIGHT
 
     def _move_angular(self, dblAngularVel:float, tplCenterRot:Tuple[float,float]=None, dblTrackToCenterAngleAdj:float=0):
         self.dblRotation += dblAngularVel
 
         if tplCenterRot:  # We're not rotating in place. Adjust rect center accordingly.
             dblRadians = math.radians(self.dblRotation + dblTrackToCenterAngleAdj)
-            self.dblRect.centerx = tplCenterRot[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians)
-            self.dblRect.centery = tplCenterRot[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
-
-        self.surf = pygame.transform.rotate(self.surfBase, self.dblRotation - self.dblInitialImageOffset)
-        self.rect = self.surf.get_rect(center=self.dblRect.center)
+            self.rectDbl.centerx = tplCenterRot[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians)
+            self.rectDbl.centery = tplCenterRot[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
 
         # If we rotate into the wall... fuck it, just pop ourselves out for now
         # TODO probly don't actually do this though
-        if self.dblRect.left < 0:
-            self.dblRect.left = 0
-        if self.dblRect.right > const.ARENA_WIDTH:
-            self.dblRect.right = const.ARENA_WIDTH
-        if self.dblRect.top <= 0:
-            self.dblRect.top = 0
-        if self.dblRect.bottom >= const.ARENA_HEIGHT:
-            self.dblRect.bottom = const.ARENA_HEIGHT
+        if self.rectDbl.left < 0:
+            self.rectDbl.left = 0
+        if self.rectDbl.right > const.ARENA_WIDTH:
+            self.rectDbl.right = const.ARENA_WIDTH
+        if self.rectDbl.top <= 0:
+            self.rectDbl.top = 0
+        if self.rectDbl.bottom >= const.ARENA_HEIGHT:
+            self.rectDbl.bottom = const.ARENA_HEIGHT
 
-        self.rect.center = self.dblRect.center
+    #endregion

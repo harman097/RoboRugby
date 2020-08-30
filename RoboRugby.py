@@ -25,6 +25,8 @@ MyUtils.PRINT_STAGE = False  # Disable stage spam
 
 # TODO properly inherit
 class GameEnv(gym.Env):
+    metadata = {'render.modes': ['human']}
+
     def __init__(self):
         Stage("Initializing RoboRugby...")
         self.grpAllSprites = pygame.sprite.Group()
@@ -90,7 +92,11 @@ class GameEnv(gym.Env):
         raise NotImplementedError("Probly just move most of the logic from __init__ to here")
         return self._get_game_state()
 
-    def render(self):
+    def render(self, mode='human'):
+
+        if mode != 'human':
+            raise NotImplementedError("Other mode types not supported.")
+
         Stage("Render RoboRugby!")
         # Clear the screen
         mScreen.fill(const.COLOR_BACKGROUND)
@@ -209,11 +215,11 @@ class GameEnv(gym.Env):
 
         return self._get_game_state(), self._get_reward(), self.game_is_done(), self._get_debug_info()
 
-    def _get_reward(self):
+    def _get_reward(self, intTeam=const.TEAM_HAPPY):
         # TODO this
         return 1
 
-    def _get_game_state(self):
+    def _get_game_state(self, intTeam=const.TEAM_HAPPY):
         # TODO this
         return 1
 
@@ -222,28 +228,20 @@ class GameEnv(gym.Env):
                self.sprGrumpyGoal.is_destroyed() or \
                self.sprHappyGoal.is_destroyed()
 
-    def _get_debug_info(self):
+    def _get_debug_info(self, intTeam=const.TEAM_HAPPY):
         # currently no need for this, but something will probly come up
         return None
 
-    # maybeeeeeeeeeeeee this will be usefull but...
-    class Wall(pygame.sprite.Sprite):
+    class RewardFunctions:
+        def default(env :'GameEnv', intTeam=const.TEAM_HAPPY) -> float:
+            lngScore = env.sprHappyGoal.get_score() - env.sprGrumpyGoal.get_score()
+            if intTeam==const.TEAM_HAPPY:
+                return lngScore
+            else:
+                return -1 * lngScore
 
-        class WallType(Enum):
-            LEFT = 1
-            RIGHT = 2
-            TOP = 3
-            BOTTOM = 4
 
-        def __init__(self, enmType: 'GameEnv.Wall.WallType'):
-            if enmType == GameEnv.Wall.WallType.LEFT:
-                self.rect = pygame.Rect(-100, -100, 100, const.ARENA_HEIGHT + 200)
-            elif enmType == GameEnv.Wall.WallType.RIGHT:
-                self.rect = pygame.Rect(const.ARENA_WIDTH, -100, 100, const.ARENA_HEIGHT + 200)
-            elif enmType == GameEnv.Wall.WallType.TOP:
-                self.rect = pygame.Rect(-100, -100, const.ARENA_WIDTH + 200, 100)
-            elif enmType == GameEnv.Wall.WallType.BOTTOM:
-                self.rect = pygame.Rect(const.ARENA_HEIGHT, -100, const.ARENA_WIDTH + 200, 100)
+
 
 
 
