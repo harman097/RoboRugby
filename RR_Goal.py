@@ -62,7 +62,7 @@ class Goal(pygame.sprite.Sprite):
                 self.dctBallsCurrent[sprBall] = self.lngFrameCount
 
     def ball_in_goal(self, sprBall: Ball) -> bool:
-        return self.triShape.contains_point(sprBall.dblRect.center)
+        return self.triShape.contains_point(sprBall.rectDbl.center)
 
     def update_score(self) -> List[Ball]:
         lstConsumedBalls = []

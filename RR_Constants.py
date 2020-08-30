@@ -16,7 +16,7 @@ GOAL_HEIGHT = 240
 BALL_RADIUS = 7
 BALL_SLOWDOWN = .995
 BALL_MIN_SPEED = 0.005
-PUSH_FACTOR = 0.35
+PUSH_FACTOR = BALL_SLOWDOWN #0.35 <-- was an issue with the "prior state" logic, restoring to general slowdown for now
 FRAMERATE = 120
 GAME_LENGTH_MINS = 3
 GAME_LENGTH_STEPS = GAME_LENGTH_MINS * 60 * FRAMERATE
@@ -61,7 +61,3 @@ CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER = (ROBOT_WIDTH/2) - (ROBOT_WIDTH_TRACKS/2
 
 BOUNCE_K_WALL = 1 # just adding it in case later we want it
 
-# # distance from center track to center robot, cubed, and flipped
-# # used often to rotate around a track when one motor engaged
-# # do not need to recalc each time (hence adding as shared const)
-# CALC_ROTATION_TERM_1 = -1 * math.pow(CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER, 3)

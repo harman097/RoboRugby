@@ -1,6 +1,8 @@
 from __future__ import absolute_import, division, print_function
 from typing import Tuple, List, Dict
 from collections import namedtuple
+from enum import Enum
+import math
 
 PRINT_STAGE = True
 
@@ -23,27 +25,52 @@ def Div0(pdblNumerator: float, pdblDenominator: float) -> float:
         raise ZeroDivisionError("Numerator AND Denominator are both 0.")
 
 Point = namedtuple('Point', ['x', 'y'])
-Vect2D = namedtuple('Vect2D', ['x', 'y'])
 
 # pygame rects are just ints, unfortunately, which makes any physics difficult
 class FloatRect:
+
     def __init__(self, dblLeft: float, dblRight: float, dblTop: float, dblBottom: float):
         if dblLeft >= dblRight:
             raise Exception("Left >= Right")
         if dblTop >= dblBottom:
             raise Exception("Top >= Bottom")
+
+        self._dblWidth = dblRight - dblLeft
+        self._dblHeight = dblBottom - dblTop
+        self._dblCenterX = (dblLeft + dblRight) / 2
+        self._dblCenterY = (dblTop + dblBottom) / 2
         self._dblLeft = dblLeft
         self._dblRight = dblRight
         self._dblTop = dblTop
         self._dblBottom = dblBottom
-        self._dblWidth = dblRight - dblLeft
-        self._dblHeight = dblBottom - dblTop
+        self._dblRotation = 0
+
+        self._dctInitialCornersRelCenter = {  # type: Dict[FloatRect.CornerType, Point]
+            FloatRect.CornerType.TOP_LEFT: Point(x=dblLeft - self._dblCenterX, y=dblTop - self._dblCenterY),
+            FloatRect.CornerType.TOP_RIGHT: Point(x=dblRight - self._dblCenterX,y=dblTop - self._dblCenterY),
+            FloatRect.CornerType.BOTTOM_LEFT: Point(x=dblLeft - self._dblCenterX, y=dblBottom - self._dblCenterY),
+            FloatRect.CornerType.BOTTOM_RIGHT: Point(x=dblRight - self._dblCenterX, y=dblBottom - self._dblCenterY)
+        }
+
+        self._dctCornersRelCenter = self._dctInitialCornersRelCenter.copy()  # type: Dict[FloatRect.CornerType, Point]
+
+    def _move_linear(self, dblDeltaX :float, dblDeltaY :float):
+        self._dblCenterX += dblDeltaX
+        self._dblLeft += dblDeltaX
+        self._dblRight += dblDeltaX
+
+        self._dblCenterY += dblDeltaY
+        self._dblTop += dblDeltaY
+        self._dblBottom += dblDeltaY
 
     def copy(self) -> 'FloatRect':
-        return FloatRect(self.left, self.right, self.top, self.bottom)
+        rectNew = FloatRect(self.left, self.right, self.top, self.bottom)
+        rectNew.rotation = self.rotation
+        return rectNew
+
+#region Properties/Getters/Setters
 
     # Getters
-
     @property
     def top(self) -> float:
         return self._dblTop
@@ -70,62 +97,156 @@ class FloatRect:
 
     @property
     def centerx(self) -> float:
-        return (self.left + self.right) / 2
+        return self._dblCenterX
 
     @property
     def centery(self) -> float:
-        return (self.top + self.bottom) / 2
+        return self._dblCenterY
 
     @property
     def center(self) -> Tuple[float, float]:
         return (self.centerx, self.centery)
 
+    @property
+    def rotation(self) -> float:
+        return self._dblRotation
+
+    def corner(self, enmCorner) -> Point:
+        return Point(
+            x=self.centerx + self._dctCornersRelCenter[enmCorner].x,
+            y=self.centery + self._dctCornersRelCenter[enmCorner].y
+        )
+
+    @property
+    def corners(self) -> List[Point]:
+        return list(map(self.corner, FloatRect.CornerType))
+
+    def side(self, enmSide: 'FloatRect.SideType') -> Tuple[Point,Point]:
+        if enmSide == FloatRect.SideType.RIGHT:
+            return (
+                self.corner(FloatRect.CornerType.TOP_RIGHT),
+                self.corner(FloatRect.CornerType.BOTTOM_RIGHT)
+            )
+        elif enmSide == FloatRect.SideType.TOP:
+            return (
+                self.corner(FloatRect.CornerType.TOP_LEFT),
+                self.corner(FloatRect.CornerType.TOP_RIGHT)
+            )
+        elif enmSide == FloatRect.SideType.LEFT:
+            return (
+                self.corner(FloatRect.CornerType.BOTTOM_LEFT),
+                self.corner(FloatRect.CornerType.TOP_LEFT)
+            )
+        elif enmSide == FloatRect.SideType.BOTTOM:
+            return (
+                self.corner(FloatRect.CornerType.BOTTOM_RIGHT),
+                self.corner(FloatRect.CornerType.BOTTOM_LEFT)
+            )
+
+    @property
+    def sides(self) -> List[Point]:
+        return list(map(self.side, FloatRect.SideType))
+
+    def side_as_right_triangle(self, enmSide: 'FloatRect.SideType') -> 'RightTriangle':
+        tplSide = self.side(enmSide)
+        tplA, tplB = tplSide
+        # determine "C" (3rd point in triangle)
+        if self.left < tplA.x < self.right:
+            shpTriangle = RightTriangle(tplA, tplB, Point(x=tplA.x, y=tplB.y))
+        else:
+            shpTriangle = RightTriangle(tplA, tplB, Point(x=tplB.x, y=tplA.y))
+        return shpTriangle
+
+    def sides_as_right_triangles(self) -> List['RightTriangle']:
+        return list(map(self.side_as_right_triangle, FloatRect.SideType))
+
+
+
     # Setters
     @top.setter
     def top(self, dblTop: float):
-        self._dblTop = dblTop
-        self._dblBottom = dblTop + self.height
+        self._move_linear(0, dblTop - self._dblTop)
 
     @bottom.setter
     def bottom(self, dblBottom: float):
-        self._dblBottom = dblBottom
-        self._dblTop = dblBottom - self.height
+        self._move_linear(0, dblBottom - self._dblBottom)
 
     @right.setter
     def right(self, dblRight: float):
-        self._dblRight = dblRight
-        self._dblLeft = dblRight - self.width
+        self._move_linear(dblRight - self._dblRight, 0)
 
     @left.setter
     def left(self, dblLeft: float):
-        self._dblLeft = dblLeft
-        self._dblRight = dblLeft + self.width
-
-    @width.setter
-    def width(self, dblWidth: float):
-        dblHalfDelta = (dblWidth - self._dblWidth)/2
-        self._dblLeft -= dblHalfDelta
-        self._dblRight += dblHalfDelta
-        self._dblWidth = dblWidth
-
-    @height.setter
-    def height(self, dblHeight: float):
-        dblHalfDelta = (dblHeight - self._dblHeight) / 2
-        self._dblTop -= dblHalfDelta
-        self._dblBottom += dblHalfDelta
-        self._dblHeight = dblHeight
+        self._move_linear(dblLeft - self._dblLeft, 0)
 
     @centerx.setter
     def centerx(self, dblCenterx: float):
-        self.left += dblCenterx - self.centerx
+        self._move_linear(dblCenterx - self._dblCenterX, 0)
 
     @centery.setter
     def centery(self, dblCentery: float):
-        self.top += dblCentery - self.centery
+        self._move_linear(0, dblCentery - self._dblCenterY)
 
     @center.setter
     def center(self, tplCenter: Tuple[float, float]):
         self.centerx, self.centery = tplCenter
+
+    @rotation.setter
+    def rotation(self, dblRotation):
+        self._dblRotation = dblRotation % 360
+        dblRotRadians = math.radians(360 - dblRotation)  # because y is flipped
+        dblCos = math.cos(dblRotRadians)
+        dblSin = math.sin(dblRotRadians)
+
+        # Rotate our corners (relative to center) by the specified angle
+        # Rotation matrix on a normal graph is:
+        #   [(cos, -sin),
+        #    (sin,  cos)]
+
+        self._dctCornersRelCenter = self._dctInitialCornersRelCenter.copy()
+        setX = set()
+        setY = set()
+        for tplKV in self._dctCornersRelCenter.items():
+            enmCornerType, tplCorner = tplKV  # unpack
+            tplRotatedCorner = Point(
+                x=-1 * tplCorner.x * dblCos + tplCorner.y * dblSin,
+                y=-1 * tplCorner.x * dblSin - tplCorner.y * dblCos
+            )
+            self._dctCornersRelCenter[enmCornerType] = tplRotatedCorner
+            setX.add(tplRotatedCorner.x)
+            setY.add(tplRotatedCorner.y)
+
+        # update l,r,t,b to reflect new rotation
+        self._dblLeft = min(setX) + self.centerx
+        self._dblRight = max(setX) + self.centerx
+        self._dblTop = min(setY) + self.centery
+        self._dblBottom = max(setY) + self.centery
+
+#endregion
+
+    class CornerType(Enum):
+        TOP_LEFT = 0
+        TOP_RIGHT = 1
+        BOTTOM_LEFT = 2
+        BOTTOM_RIGHT = 3
+
+    class SideType(Enum):
+        RIGHT = 0  # side that is at 0 deg from center, relative to rect's rotation
+        TOP = 90  # side that is at 90 deg from center, relative to rect's rotation
+        LEFT = 180  # side that is at 180 deg from center, relative to rect's rotation
+        BOTTOM = 270  # side that is at 270 deg from center, relative to rect's rotation
+
+    def contains_point(self, tplPoint: Tuple[float,float]) -> bool:
+        dblX, dblY = tplPoint # unpack
+        if (self.left <= dblX <= self.right) and (self.top <= dblY <= self.bottom):
+            if self.rotation % 90 < 1:
+                return True
+            else:
+                for shpTriangle in self.sides_as_right_triangles():
+                    if shpTriangle.contains_point(tplPoint):
+                        return True
+        else:
+            return False
 
 class RightTriangle():
     def __init__(self, tpl1 :Tuple[float,float], tpl2 :Tuple[float,float], tpl3 :Tuple[float,float]):
@@ -136,7 +257,7 @@ class RightTriangle():
             setX.add(tplPoint.x)
             setY.add(tplPoint.y)
 
-        if len(setX) != 2 or len(setY) != 2:
+        if len(setX) != 2 or len(setY) != 2 or len(setPoints) != 3:
             raise Exception(f"Not a valid right triangle: {tpl1}, {tpl2}, {tpl3}")
 
         self._dblLeft = min(setX)
@@ -211,8 +332,8 @@ class RightTriangle():
     def contains_point(self, tplPoint: Tuple[float,float]) -> bool:
         dblX, dblY = tplPoint # unpack
         if (self.left <= dblX <= self.right) and (self.top <= dblY <= self.bottom):
-            dblSlopeHyp = (self.tplHyp1.y - self.tplHyp0.y) / (self.tplHyp1.x - self.tplHyp0.x)
-            dblSlopePnt = (dblY - self.tplHyp0.y) / (dblX - self.tplHyp0.x)
+            dblSlopeHyp = Div0(self.tplHyp1.y - self.tplHyp0.y, self.tplHyp1.x - self.tplHyp0.x)
+            dblSlopePnt = Div0(dblY - self.tplHyp0.y, dblX - self.tplHyp0.x)
             return dblSlopePnt >= dblSlopeHyp
         else:
             return False
