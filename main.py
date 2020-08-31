@@ -76,7 +76,22 @@ while blnRunGame:
             # (random.randint(-1,1), random.randint(-1,1))
             lstInput.append(action)
 
-        env.step(lstInput)
+        observation, reward, done, info  = env.step(lstInput)
+
+        if done:
+            blnRunGame = False
+
+            lngScoreHappy = env.sprHappyGoal.get_score()
+            lngScoreGrumpy = env.sprGrumpyGoal.get_score()
+            print("\nFinal Score")
+            print("Happy Bot %1d  |  Grumpy Bot %1d" % (lngScoreHappy, lngScoreGrumpy))
+            if lngScoreHappy > lngScoreGrumpy:
+                print("Team Happy Bot WINS!!!")
+            elif lngScoreHappy == lngScoreGrumpy:
+                print("Tie!")
+            else:
+                print("Team Grump Bot WINS!!!  ~~boo~~")
+
     else:
         raise NotImplementedError("Training section not done.")
 

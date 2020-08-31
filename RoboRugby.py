@@ -226,7 +226,8 @@ class GameEnv(gym.Env):
     def game_is_done(self):
         return self.lngStepCount > const.GAME_LENGTH_STEPS or \
                self.sprGrumpyGoal.is_destroyed() or \
-               self.sprHappyGoal.is_destroyed()
+               self.sprHappyGoal.is_destroyed() or \
+               not bool(self.grpBalls)
 
     def _get_debug_info(self, intTeam=const.TEAM_HAPPY):
         # currently no need for this, but something will probly come up
