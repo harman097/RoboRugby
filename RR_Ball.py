@@ -7,7 +7,6 @@ from MyUtils import FloatRect, Point
 class Ball(pygame.sprite.Sprite):
     def __init__(self, tplColor):
         super(Ball, self).__init__()
-        self.blnHitWall = False
         self.dblXVelocity = 0
         self.dblYVelocity = 0
         self.tplColor = tplColor
@@ -29,10 +28,11 @@ class Ball(pygame.sprite.Sprite):
         # actual rect, used internally to calculate location
         self.rectDbl = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
         self.rectDblPrior = self.rectDbl.copy()
+        self.lngFrameMass = const.MASS_BALL
 
     def on_step_begin(self):
         self.rectDblPrior = self.rectDbl.copy()
-        self.blnHitWall = False
+        self.lngFrameMass = const.MASS_BALL
 
     def on_step_end(self):
         AvoidConsoleSpam = 'Yes'
@@ -47,15 +47,19 @@ class Ball(pygame.sprite.Sprite):
         if self.rectDbl.left < 0:
             self.rectDbl.left *= -1 * const.BOUNCE_K_WALL
             self.dblXVelocity *= -1 * const.BOUNCE_K_WALL
+            self.lngFrameMass = const.MASS_WALL
         if self.rectDbl.right > const.ARENA_WIDTH:
             self.rectDbl.right = const.ARENA_WIDTH - (self.rectDbl.right - const.ARENA_WIDTH) * const.BOUNCE_K_WALL
             self.dblXVelocity *= -1 * const.BOUNCE_K_WALL
+            self.lngFrameMass = const.MASS_WALL
         if self.rectDbl.top <= 0:
             self.rectDbl.top *= -1 * const.BOUNCE_K_WALL
             self.dblYVelocity *= -1 * const.BOUNCE_K_WALL
+            self.lngFrameMass = const.MASS_WALL
         if self.rectDbl.bottom >= const.ARENA_HEIGHT:
             self.rectDbl.bottom = const.ARENA_HEIGHT - (self.rectDbl.bottom - const.ARENA_WIDTH) * const.BOUNCE_K_WALL
             self.dblYVelocity *= -1 * const.BOUNCE_K_WALL
+            self.lngFrameMass = const.MASS_WALL
 
         self.rect.left = int(self.rectDbl.left)
         self.rect.top = int(self.rectDbl.top)

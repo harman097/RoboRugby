@@ -36,8 +36,8 @@ TEAM_HAPPY = 1
 TEAM_GRUMPY = -1
 
 # NN controls (most likely)
-KEY_LEFT_MOTOR_FORWARD = pygame.K_w
-KEY_LEFT_MOTOR_BACKWARD = pygame.K_s
+KEY_LEFT_MOTOR_FORWARD = pygame.K_i
+KEY_LEFT_MOTOR_BACKWARD = pygame.K_k
 KEY_RIGHT_MOTOR_FORWARD = pygame.K_o
 KEY_RIGHT_MOTOR_BACKWARD = pygame.K_l
 
@@ -59,5 +59,14 @@ COLOR_GOAL_GRUMPY = (242, 53, 87)
 # Calculation parameters
 CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER = (ROBOT_WIDTH/2) - (ROBOT_WIDTH_TRACKS/2)
 
-BOUNCE_K_WALL = 1 # just adding it in case later we want it
+BOUNCE_K_WALL = .8 # just adding it in case later we want it
+BOUNCE_K_ROBOT = .5
+BOUNCE_K_BALL = .995
+
+# "Mass" (so to speak)
+# In the world of trashy physics, you just straight up can't
+# affect the momentum of something with higher mass
+MASS_BALL = 1
+MASS_ROBOT = 2
+MASS_WALL = 3
 

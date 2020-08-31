@@ -193,6 +193,9 @@ class FloatRect:
 
     @rotation.setter
     def rotation(self, dblRotation):
+        if dblRotation == self._dblRotation:
+            return
+
         self._dblRotation = dblRotation % 360
         dblRotRadians = math.radians(360 - dblRotation)  # because y is flipped
         dblCos = math.cos(dblRotRadians)
