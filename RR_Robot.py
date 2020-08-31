@@ -60,6 +60,7 @@ class Robot(pygame.sprite.Sprite):
         self.intTeam = intTeam
         self.lngLThrust = 0
         self.lngRThrust = 0
+        self.lngFrameMass = const.MASS_ROBOT
 
         # self.rect = rendering (integers), self.dblRect = location calc (float)
         self.rectDbl = FloatRect(0, const.ROBOT_LENGTH, 0, const.ROBOT_WIDTH)
