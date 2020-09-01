@@ -78,7 +78,7 @@ class Goal(pygame.sprite.Sprite):
         return lstConsumedBalls
 
     def get_score(self):
-        return len(self.dctPosBallsScored) * const.POINTS_BALL - len(self.dctNegBallsScored) * const.POINTS_BALL
+        return len(self.dctPosBallsScored) * const.POINTS_BALL_SCORED - len(self.dctNegBallsScored) * const.POINTS_BALL_SCORED
 
     def is_destroyed(self) -> bool:
         return len(self.dctNegBallsScored) >= const.MAX_NEG_BALLS

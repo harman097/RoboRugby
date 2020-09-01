@@ -1,4 +1,5 @@
 import pygame
+import math
 
 ARENA_WIDTH = 800
 ARENA_HEIGHT = 800
@@ -29,8 +30,18 @@ NUM_ROBOTS_HAPPY = 2
 NUM_ROBOTS_GRUMPY = 2
 NUM_ROBOTS_TOTAL = NUM_ROBOTS_GRUMPY + NUM_ROBOTS_HAPPY
 
-POINTS_BALL = 10
 MAX_NEG_BALLS = 3
+POINTS_BALL_SCORED = 1000
+POINTS_TIME_PENALTY = 1 # Time penalty per frame
+POINTS_ROBOT_CRASH_PENALTY = 10
+POINTS_ROBOT_IN_GOAL_PENALTY = 10
+# Let's say that if a ball starts at (0,0) and travels all the way to (ARENA_WIDTH,ARENA_HEIGHT)
+# the ball would get this many points:
+POINTS_BALL_TRAVEL_MAX = 1000
+# Then for each pixel moved closer to the goal it gets:
+POINTS_BALL_TRAVEL_MULT = POINTS_BALL_TRAVEL_MAX / math.pow(ARENA_WIDTH**2 + ARENA_HEIGHT**2, 2)
+# If you destroy a goal, get all the points you possibly could from dunking all the balls
+POINTS_GOAL_DESTROYED = (POINTS_BALL_SCORED + POINTS_BALL_TRAVEL_MAX) * (NUM_BALL_POS + NUM_BALL_NEG)
 
 TEAM_HAPPY = 1
 TEAM_GRUMPY = -1
@@ -69,4 +80,3 @@ BOUNCE_K_BALL = .995
 MASS_BALL = 1
 MASS_ROBOT = 2
 MASS_WALL = 3
-

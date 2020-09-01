@@ -4,6 +4,7 @@ import MyUtils
 from MyUtils import Stage
 import gym
 import pygame
+import math
 import RR_Constants as const
 from enum import Enum
 
@@ -72,21 +73,27 @@ class GameEnv(gym.Env):
 
         Stage("Give it some balls!")
         self.grpBalls = pygame.sprite.Group()
-        for _ in range(const.NUM_BALL_POS):
+        self._lstPosBalls = [None] * const.NUM_BALL_POS  # type: List[Ball]
+        self._lstNegBalls = [None] * const.NUM_BALL_POS  # type: List[Ball]
+        for i in range(const.NUM_BALL_POS):
             while True:  # Just make one until we have no initial collisions
                 objNewBall = Ball(const.COLOR_BALL_POS)
                 if pygame.sprite.spritecollideany(objNewBall, self.grpAllSprites) is None:
                     break
             self.grpBalls.add(objNewBall)
             self.grpAllSprites.add(objNewBall)
+            self._lstPosBalls[i] = objNewBall
 
-        for _ in range(const.NUM_BALL_NEG):
+        for i in range(const.NUM_BALL_NEG):
             while True:  # Just make one until we have no initial collisions
                 objNewBall = Ball(const.COLOR_BALL_NEG)
                 if pygame.sprite.spritecollideany(objNewBall, self.grpAllSprites) is None:
                     break
             self.grpBalls.add(objNewBall)
             self.grpAllSprites.add(objNewBall)
+            self._lstNegBalls[i] = objNewBall
+
+        self.dblBallDistSum = self._get_ball_distance_sum()
 
     def reset(self):
         raise NotImplementedError("Probly just move most of the logic from __init__ to here")
@@ -119,8 +126,12 @@ class GameEnv(gym.Env):
     def step(self, lstArgs: List[Tuple]):
         if self.game_is_done():
             raise Exception("Game is over. Go home.")
-        else:
-            self.lngStepCount += 1
+
+        Stage("Initialize")
+        self.lngStepCount += 1
+        dblGrumpyScore = -1 * const.POINTS_TIME_PENALTY
+        dblHappyScore = -1 * const.POINTS_TIME_PENALTY
+        setNaughtyRobots = set()
 
         Stage("Prep ze sprites!")
         for sprSprite in self.grpAllSprites:
@@ -167,7 +178,11 @@ class GameEnv(gym.Env):
             Stage("Did they smash each other?")
             for sprRobot1, sprRobot2 in TrashyPhysics.collision_pairs_self(
                     self.grpRobots, fncCollided=TrashyPhysics.robots_collided):
-                # TODO deduct some points here but... who gets deducted? "who smashed who" should matter...
+                # TODO logic on "who is at fault?" probly needs to be a bit better...
+                if sprRobot1.lngRThrust != 0 or sprRobot1.lngLThrust != 0:
+                    setNaughtyRobots.add(sprRobot1)
+                if sprRobot2.lngRThrust != 0 or sprRobot2.lngLThrust != 0:
+                    setNaughtyRobots.add(sprRobot2)
                 lngNaughtyLoop = 0
                 while True:
                     lngNaughtyLoop += 1
@@ -200,24 +215,65 @@ class GameEnv(gym.Env):
         Stage("Flag balls in the goal")
         self.sprHappyGoal.track_balls(self.grpBalls.sprites())
         self.sprGrumpyGoal.track_balls(self.grpBalls.sprites())
+        
+        Stage("Flag robots in goals")
+        for sprRobot in self.lstRobots:
+            if TrashyPhysics.robot_in_goal(sprRobot, self.sprHappyGoal) or \
+                    TrashyPhysics.robot_in_goal(sprRobot, self.sprGrumpyGoal):
+                if sprRobot.intTeam == const.TEAM_HAPPY:
+                    dblHappyScore -= const.POINTS_ROBOT_IN_GOAL_PENALTY
+                else:
+                    dblGrumpyScore -= const.POINTS_ROBOT_IN_GOAL_PENALTY
 
         Stage("Commit balls that have scored")
-        for sprBall in self.sprGrumpyGoal.update_score():
-            sprBall.kill()
-
+        dblScoreDelta = 0  # positive = good for Happy, negative = good for Grumpy
+        
         for sprBall in self.sprHappyGoal.update_score():
+            if sprBall.tplColor == const.COLOR_BALL_POS:
+                dblScoreDelta += const.POINTS_BALL_SCORED
+            else:
+                dblScoreDelta -= const.POINTS_BALL_SCORED
             sprBall.kill()
+            
+        for sprBall in self.sprGrumpyGoal.update_score():
+            if sprBall.tplColor == const.COLOR_BALL_POS:
+                dblScoreDelta -= const.POINTS_BALL_SCORED
+            else:
+                dblScoreDelta += const.POINTS_BALL_SCORED
+            sprBall.kill()
+            
+        dblHappyScore += dblScoreDelta
+        dblGrumpyScore -= dblScoreDelta
 
         Stage("Handle any end of step activities")
         for sprSprite in self.grpAllSprites:
             if hasattr(sprSprite, 'on_step_end'):
                 sprSprite.on_step_end()
 
-        return self._get_game_state(), self._get_reward(), self.game_is_done(), self._get_debug_info()
+        Stage("Who was naughty?")
+        for sprNaughtyBot in setNaughtyRobots:
+            if sprNaughtyBot.intTeam == const.TEAM_HAPPY:
+                dblHappyScore -= const.POINTS_ROBOT_CRASH_PENALTY
+            else:
+                dblGrumpyScore -= const.POINTS_ROBOT_CRASH_PENALTY
 
-    def _get_reward(self, intTeam=const.TEAM_HAPPY):
-        # TODO this
-        return 1
+        Stage("Award points for ball travel")
+        dblBallDistSumStart = self.dblBallDistSum
+        self.dblBallDistSum = self._get_ball_distance_sum()
+        dblDelta = const.POINTS_BALL_TRAVEL_MULT * (self.dblBallDistSum - dblBallDistSumStart)
+        dblHappyScore += dblDelta  # ball travel points are zero-sum
+        dblGrumpyScore -= dblDelta
+
+        Stage("Anybody win?")
+        if self.sprHappyGoal.is_destroyed():
+            dblGrumpyScore += const.POINTS_GOAL_DESTROYED
+            dblHappyScore -= const.POINTS_GOAL_DESTROYED
+
+        if self.sprGrumpyGoal.is_destroyed():
+            dblHappyScore += const.POINTS_GOAL_DESTROYED
+            dblGrumpyScore -= const.POINTS_GOAL_DESTROYED
+
+        return self._get_game_state(), dblHappyScore, self.game_is_done(), GameEnv.DebugInfo(dblGrumpyScore)
 
     def _get_game_state(self, intTeam=const.TEAM_HAPPY):
         # TODO this
@@ -228,18 +284,20 @@ class GameEnv(gym.Env):
                self.sprGrumpyGoal.is_destroyed() or \
                self.sprHappyGoal.is_destroyed() or \
                not bool(self.grpBalls)
+    
+    def _get_ball_distance_sum(self) -> float:
+        """ Distance meaning 'Distance from Grumpy's goal'"""
+        def _dist(sprBall:Ball)->float:
+            return math.pow(sprBall.rectDbl.centerx**2 + sprBall.rectDbl.centery**2, .5)
+        
+        # Higher score the farther away positive balls get from Grumpy's goal (and therefore closer to Happy's goal)
+        # Lower score the farther away negative balls get from Grumpy's goal (and therefore closer to Happy's goal)
+        return sum(map(_dist, self._lstPosBalls)) - sum(map(_dist, self._lstNegBalls))
 
-    def _get_debug_info(self, intTeam=const.TEAM_HAPPY):
-        # currently no need for this, but something will probly come up
-        return None
-
-    class RewardFunctions:
-        def default(env :'GameEnv', intTeam=const.TEAM_HAPPY) -> float:
-            lngScore = env.sprHappyGoal.get_score() - env.sprGrumpyGoal.get_score()
-            if intTeam==const.TEAM_HAPPY:
-                return lngScore
-            else:
-                return -1 * lngScore
+    # Add more things here as they come up
+    class DebugInfo:
+        def __init__(self, dblGrumpyScore:float):
+            self.dblGrumpyScore = dblGrumpyScore  #type: float
 
 
 

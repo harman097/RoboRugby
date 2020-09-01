@@ -8,6 +8,11 @@ from RR_Goal import Goal
 from MyUtils import FloatRect, RightTriangle, Point, Div0
 import math
 
+def robot_in_goal(sprRobot: Robot, sprGoal: Goal) -> bool:
+    for tplCorner in sprRobot.rectDbl.corners:
+        if sprGoal.triShape.contains_point(tplCorner):
+            return True
+
 def robots_collided(sprRobot1: Robot, sprRobot2: Robot) -> bool:
     if sprRobot1.rectDbl.contains_point(sprRobot2.rectDbl.center):
         return True
