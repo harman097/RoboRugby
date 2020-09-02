@@ -3,9 +3,11 @@ from typing import List, Dict, Tuple
 import MyUtils
 from MyUtils import Stage
 import gym
+from gym.utils import seeding
 import pygame
 import math
 import RR_Constants as const
+import numpy as np
 from enum import Enum
 
 Stage("Initialize pygame")
@@ -28,6 +30,14 @@ MyUtils.PRINT_STAGE = False  # Disable stage spam
 class GameEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
+    @property
+    def lstHappyBots(self) -> List[Robot]:  # Happy bots in 1st half of list
+        return self.lstRobots[const.NUM_ROBOTS_HAPPY:]
+
+    @property
+    def lstGrumpyBots(self) -> List[Robot]:  # Grumpy bots in 2nd half of list
+        return self.lstRobots[:const.NUM_ROBOTS_HAPPY]
+
     def __init__(self):
         Stage("Initializing RoboRugby...")
         self.grpAllSprites = pygame.sprite.Group()
@@ -40,10 +50,6 @@ class GameEnv(gym.Env):
             pygame.Rect(-100, -100, const.ARENA_WIDTH + 200, 100),
             pygame.Rect(const.ARENA_HEIGHT, -100, const.ARENA_WIDTH + 200, 100)
         ]
-
-        # TODO set these properly (if you want to properly implement gym.Env)
-        # self.action_space = gym.spaces.Tuple()? .MultiDiscrete()
-        # self.observation_space = gym.spaces.MultiDiscrete()? Other?
 
         Stage("Here are the goals")
         self.sprHappyGoal = Goal(const.TEAM_HAPPY)
@@ -95,8 +101,20 @@ class GameEnv(gym.Env):
 
         self.dblBallDistSum = self._get_ball_distance_sum()
 
-    def reset(self):
-        raise NotImplementedError("Probly just move most of the logic from __init__ to here")
+        # Minitaur gym is a good example of similar inputs/outputs
+        # Velocity/position/rotation can never be > bounds of the arena... barring crazy constants
+        arrState = self._get_game_state()
+        dblObservationHigh = max(const.ARENA_WIDTH, const.ARENA_HEIGHT, 360)
+        dblObservationLow = dblObservationHigh * -1
+        self.observation_space = gym.spaces.Box(
+            dblObservationLow, dblObservationHigh, dtype=np.float32, shape=arrState.shape)
+
+        alngActions = np.array([1]*len(self.lstRobots)*2)
+        # tip: '-' operator can be applied to numpy arrays (flips each element)
+        self.action_space = gym.spaces.Box(-alngActions, alngActions, dtype=np.int)
+
+    def reset(self) -> np.ndarray:
+        # todo this should probly be a little... better
         return self._get_game_state()
 
     def render(self, mode='human'):
@@ -273,11 +291,54 @@ class GameEnv(gym.Env):
             dblHappyScore += const.POINTS_GOAL_DESTROYED
             dblGrumpyScore -= const.POINTS_GOAL_DESTROYED
 
-        return self._get_game_state(), dblHappyScore, self.game_is_done(), GameEnv.DebugInfo(dblGrumpyScore)
+        return self._get_game_state(intTeam=const.TEAM_HAPPY), \
+               dblHappyScore, \
+               self.game_is_done(), \
+               GameEnv.DebugInfo(
+                   self._get_game_state(intTeam=const.TEAM_GRUMPY),
+                   dblGrumpyScore
+               )
 
-    def _get_game_state(self, intTeam=const.TEAM_HAPPY):
-        # TODO this
-        return 1
+    def _get_game_state(self, intTeam=const.TEAM_HAPPY) -> np.ndarray:
+        """
+        Key pieces we're outputting (not necessarily in this order):
+        Center X,Y coords of each robot.
+        Center X,Y coords of each robot, prior step.
+        Rotation of each robot.
+        Rotation of each robot, prior step.
+        Center X,Y coords of each ball.
+        Center X,Y coords of each ball, prior step.
+        :param intTeam: Is this the game state from happy team's perspective? or grumpy's?
+        :return: numpy.ndarray
+        """
+        if intTeam == const.TEAM_HAPPY:  # report happy balls first
+            return np.concatenate((
+                list(map(self._robot_state, self.lstHappyBots)),
+                list(map(self._robot_state, self.lstGrumpyBots)),
+                list(map(self._ball_state, self._lstPosBalls)),
+                list(map(self._ball_state, self._lstNegBalls))
+            ), axis=None)
+        else:  # report grumpy balls first
+            return np.concatenate((
+                list(map(self._robot_state, self.lstGrumpyBots)),
+                list(map(self._robot_state, self.lstHappyBots)),
+                list(map(self._ball_state, self._lstPosBalls)),
+                list(map(self._ball_state, self._lstNegBalls))
+            ), axis=None)
+
+    def _ball_state(self, sprBall :Ball) -> List[float]:
+        return [sprBall.rectDbl.centerx,
+                sprBall.rectDbl.centery,
+                sprBall.rectDblPriorStep.centerx,
+                sprBall.rectDblPriorStep.centery]
+
+    def _robot_state(self, sprRobot :Robot) -> List[float]:
+        return [sprRobot.rectDbl.centerx,
+                sprRobot.rectDbl.centery,
+                sprRobot.rectDbl.rotation,
+                sprRobot.rectDblPriorStep.centerx,
+                sprRobot.rectDblPriorStep.centery,
+                sprRobot.rectDblPriorStep.rotation]
 
     def game_is_done(self):
         return self.lngStepCount > const.GAME_LENGTH_STEPS or \
@@ -296,8 +357,14 @@ class GameEnv(gym.Env):
 
     # Add more things here as they come up
     class DebugInfo:
-        def __init__(self, dblGrumpyScore:float):
+        def __init__(self, adblGrumpyState:np.ndarray, dblGrumpyScore:float):
+            self.adblGrumpyState = adblGrumpyState  #type: np.ndarray
             self.dblGrumpyScore = dblGrumpyScore  #type: float
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
 
 
 

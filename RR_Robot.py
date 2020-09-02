@@ -41,7 +41,7 @@ class Robot(pygame.sprite.Sprite):
         # self.rect = self.surf.get_rect(center=(self.rectDbl.center))
 
     @property
-    def rectDblPrior(self) -> FloatRect:
+    def rectDblPriorFrame(self) -> FloatRect:
         lngI = (self.lngMoveCount - 1) % Robot._slngMoveHistorySize
         if self._lstStates[lngI] is None:
             return self.rectDbl.copy()
@@ -78,6 +78,7 @@ class Robot(pygame.sprite.Sprite):
             self.rectDbl.centery = random.randint(const.ROBOT_LENGTH * 2, const.ARENA_HEIGHT / 2 - const.ROBOT_LENGTH * 2)
             self.rectDbl.rotation = Robot.slngGrumpyRobotInitialRot
 
+        self.rectDblPriorStep = self.rectDbl.copy()
         self.lngMoveCount = 0
         self._lstStates = [None]*self._slngMoveHistorySize # type: List[Tuple[float, float, float, int]]
 
@@ -105,6 +106,9 @@ class Robot(pygame.sprite.Sprite):
             self.lngMoveCount -= 1
             return True
         return False
+
+    def on_step_begin(self):
+        self.rectDblPriorStep = self.rectDbl.copy()
 
     def _try_restore_state(self, lngMoveCount: int) -> bool:
         intI = lngMoveCount % self._slngMoveHistorySize
