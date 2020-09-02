@@ -27,11 +27,11 @@ class Ball(pygame.sprite.Sprite):
 
         # actual rect, used internally to calculate location
         self.rectDbl = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
-        self.rectDblPrior = self.rectDbl.copy()
+        self.rectDblPriorStep = self.rectDbl.copy()
         self.lngFrameMass = const.MASS_BALL
 
     def on_step_begin(self):
-        self.rectDblPrior = self.rectDbl.copy()
+        self.rectDblPriorStep = self.rectDbl.copy()
         self.lngFrameMass = const.MASS_BALL
 
     def on_step_end(self):
