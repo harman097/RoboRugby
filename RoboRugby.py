@@ -8,6 +8,8 @@ import pygame
 import math
 import RR_Constants as const
 import numpy as np
+import imageio
+from PIL import Image
 from enum import Enum
 
 Stage("Initialize pygame")
@@ -28,7 +30,10 @@ MyUtils.PRINT_STAGE = False  # Disable stage spam
 
 # TODO properly inherit
 class GameEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
+    metadata = {
+        'render.modes': ['human', 'rgb_array'],
+        'video.frames_per_second':const.FRAMERATE
+    }
 
     @property
     def lstHappyBots(self) -> List[Robot]:  # Happy bots in 1st half of list
@@ -103,24 +108,23 @@ class GameEnv(gym.Env):
 
         # Minitaur gym is a good example of similar inputs/outputs
         # Velocity/position/rotation can never be > bounds of the arena... barring crazy constants
-        arrState = self._get_game_state()
-        dblObservationHigh = max(const.ARENA_WIDTH, const.ARENA_HEIGHT, 360)
-        dblObservationLow = dblObservationHigh * -1
-        self.observation_space = gym.spaces.Box(
-            dblObservationLow, dblObservationHigh, dtype=np.float32, shape=arrState.shape)
+        if GameEnv.observation_space is None:  # shared variable from base class, gym.Env()
+            arrState = self._get_game_state()
+            dblObservationHigh = max(const.ARENA_WIDTH, const.ARENA_HEIGHT, 360)
+            dblObservationLow = dblObservationHigh * -1
+            GameEnv.observation_space = gym.spaces.Box(
+                dblObservationLow, dblObservationHigh, dtype=np.float32, shape=arrState.shape)
 
-        alngActions = np.array([1]*len(self.lstRobots)*2)
-        # tip: '-' operator can be applied to numpy arrays (flips each element)
-        self.action_space = gym.spaces.Box(-alngActions, alngActions, dtype=np.int)
+        if GameEnv.action_space is None:  # shared variable from base class, gym.Env()
+            alngActions = np.array([1]*len(self.lstRobots)*2)
+            # tip: '-' operator can be applied to numpy arrays (flips each element)
+            GameEnv.action_space = gym.spaces.Box(-alngActions, alngActions, dtype=np.int)
 
     def reset(self) -> np.ndarray:
         # todo this should probly be a little... better
         return self._get_game_state()
 
     def render(self, mode='human'):
-
-        if mode != 'human':
-            raise NotImplementedError("Other mode types not supported.")
 
         Stage("Render RoboRugby!")
         # Clear the screen
@@ -140,6 +144,19 @@ class GameEnv(gym.Env):
 
         # update the display
         pygame.display.flip()
+
+        if mode == 'human':
+            return None
+        elif mode == 'rgb_array':
+            return np.array(
+                Image.frombytes(
+                    'RGB',
+                    (mScreen.get_width(), mScreen.get_height()),
+                    pygame.image.tostring(mScreen, 'RGB')
+                )
+            )
+        else:
+            raise NotImplementedError("Other mode types not supported.")
 
     def step(self, lstArgs: List[Tuple]):
         if self.game_is_done():
@@ -365,6 +382,12 @@ class GameEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    def close(self):  # from gym/core.py
+        """Override close in your subclass to perform any necessary cleanup.
+        Environments will automatically close() themselves when
+        garbage collected or when the program exits.
+        """
+        pass
 
 
 

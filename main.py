@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 from MyUtils import Stage
 import pygame
 import random
+import imageio
 import RoboRugby
 from RoboRugby import const
 
@@ -13,11 +14,17 @@ from RoboRugby import const
 
 blnPLAYER = True  # person is playing
 blnRENDER = True  # should we slow it down and render?
+blnRECORD = True
+strVideoFile = "SeeHowAwesomeYouDid.mp4"
 if blnPLAYER:
     blnRENDER = True
 
 if blnRENDER:
     objClock = pygame.time.Clock()
+
+objVideoWriter = None
+if blnRECORD:
+    objVideoWriter = imageio.get_writer(strVideoFile, fps=RoboRugby.GameEnv.metadata['video.frames_per_second'])
 
 Stage("Start the game!")
 env = RoboRugby.GameEnv()
@@ -96,9 +103,14 @@ while blnRunGame:
         raise NotImplementedError("Training section not done.")
 
     if blnRENDER:
-        env.render()
+        if blnRECORD:
+            objVideoWriter.append_data(env.render(mode='rgb_array'))
+        else:
+            env.render(mode='human')
         # Ensure we maintain a framerate of 120 fps
         objClock.tick(const.FRAMERATE)
 
+if objVideoWriter is not None:
+    objVideoWriter.close()
 Stage("Bye!")
 pygame.quit()
