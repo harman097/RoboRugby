@@ -1,7 +1,7 @@
 import pygame
-import RR_Constants as const
+import robo_rugby.env.RR_Constants as const
 from typing import List
-from RR_Ball import Ball
+from robo_rugby.env.RR_Ball import Ball
 from MyUtils import Div0, RightTriangle, Point
 
 class Goal(pygame.sprite.Sprite):

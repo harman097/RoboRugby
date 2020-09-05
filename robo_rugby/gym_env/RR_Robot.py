@@ -3,16 +3,16 @@ from typing import Tuple, Dict, List
 import math
 import random
 from enum import Enum
-import RR_Constants as const
+import robo_rugby.env.RR_Constants as const
 from MyUtils import FloatRect, Point
 
 class Robot(pygame.sprite.Sprite):
     __instance_count = 0
 
-    ssurfHappyRobot = pygame.image.load("Happy_Robot_40x20.png").convert()
+    ssurfHappyRobot = pygame.image.load("robo_rugby/resources/Happy_Robot_40x20.png").convert()
     ssurfHappyRobot.set_colorkey((0,0,0), pygame.RLEACCEL)
     slngHappyRobotInitialRot = 90
-    ssurfGrumpyRobot = pygame.image.load("Grumpy_Robot_40x20.png").convert()
+    ssurfGrumpyRobot = pygame.image.load("robo_rugby/resources/Grumpy_Robot_40x20.png").convert()
     ssurfGrumpyRobot.set_colorkey((0, 0, 0), pygame.RLEACCEL)
     slngGrumpyRobotInitialRot = -90
 
