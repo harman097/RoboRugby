@@ -1,4 +1,4 @@
-import RR_Constants as const
+import robo_rugby.env.RR_Constants as const
 import pygame
 import random
 import math

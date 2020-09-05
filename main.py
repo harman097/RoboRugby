@@ -4,8 +4,9 @@ from MyUtils import Stage
 import pygame
 import random
 import imageio
-import RoboRugby
-from RoboRugby import const
+import robo_rugby
+from robo_rugby.env.RoboRugby import GameEnv
+import robo_rugby.env.RR_Constants as const
 
 # Each frame of the game is driven by step()
 #
@@ -24,10 +25,10 @@ if blnRENDER:
 
 objVideoWriter = None
 if blnRECORD:
-    objVideoWriter = imageio.get_writer(strVideoFile, fps=RoboRugby.GameEnv.metadata['video.frames_per_second'])
+    objVideoWriter = imageio.get_writer(strVideoFile, fps=GameEnv.metadata['video.frames_per_second'])
 
 Stage("Start the game!")
-env = RoboRugby.GameEnv(RoboRugby.GameEnv.CONFIG_STANDARD)
+env = GameEnv(GameEnv.CONFIG_STANDARD)
 blnRunGame = True
 while blnRunGame:
 

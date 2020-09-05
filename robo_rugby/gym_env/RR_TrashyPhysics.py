@@ -1,11 +1,11 @@
 import pygame
 from pygame.sprite import Sprite
-from typing import List, Dict, Tuple
-import RR_Constants as const
-from RR_Robot import Robot #TODO reenable
-from RR_Ball import Ball
-from RR_Goal import Goal
-from MyUtils import FloatRect, RightTriangle, Point, Div0
+from typing import List, Tuple
+import robo_rugby.env.RR_Constants as const
+from robo_rugby.env.RR_Robot import Robot
+from robo_rugby.env.RR_Ball import Ball
+from robo_rugby.env.RR_Goal import Goal
+from MyUtils import FloatRect, Point, Div0
 import math
 
 def robot_in_goal(sprRobot: Robot, sprGoal: Goal) -> bool:

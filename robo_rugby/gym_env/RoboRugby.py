@@ -7,7 +7,7 @@ from gym.utils import seeding
 import pygame
 import math
 import random
-import RR_Constants as const
+import robo_rugby.env.RR_Constants as const
 import numpy as np
 import imageio
 from PIL import Image
@@ -17,10 +17,10 @@ Stage("Initialize pygame")
 pygame.init()
 mScreen = pygame.display.set_mode((const.ARENA_WIDTH, const.ARENA_HEIGHT))
 
-from RR_Ball import Ball
-from RR_Robot import Robot
-from RR_Goal import Goal
-import RR_TrashyPhysics as TrashyPhysics
+from robo_rugby.env.RR_Ball import Ball
+from robo_rugby.env.RR_Robot import Robot
+from robo_rugby.env.RR_Goal import Goal
+import robo_rugby.env.RR_TrashyPhysics as TrashyPhysics
 
 MyUtils.PRINT_STAGE = False  # Disable stage spam
 
