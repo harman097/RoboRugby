@@ -1,9 +1,7 @@
-import robo_rugby.env.RR_Constants as const
+import robo_rugby.gym_env.RR_Constants as const
 import pygame
-import random
-import math
-from typing import Tuple, Dict, List
-from MyUtils import FloatRect, Point
+from typing import Tuple
+from MyUtils import FloatRect
 
 class Ball(pygame.sprite.Sprite):
 

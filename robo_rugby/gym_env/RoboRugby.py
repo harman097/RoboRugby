@@ -1,26 +1,24 @@
 from __future__ import absolute_import, division, print_function
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 import MyUtils
-from MyUtils import Stage, Point, FloatRect, RightTriangle
+from MyUtils import Stage
 import gym
 from gym.utils import seeding
 import pygame
 import math
 import random
-import robo_rugby.env.RR_Constants as const
+import robo_rugby.gym_env.RR_Constants as const
 import numpy as np
-import imageio
 from PIL import Image
-from enum import Enum
 
 Stage("Initialize pygame")
 pygame.init()
 mScreen = pygame.display.set_mode((const.ARENA_WIDTH, const.ARENA_HEIGHT))
 
-from robo_rugby.env.RR_Ball import Ball
-from robo_rugby.env.RR_Robot import Robot
-from robo_rugby.env.RR_Goal import Goal
-import robo_rugby.env.RR_TrashyPhysics as TrashyPhysics
+from robo_rugby.gym_env.RR_Ball import Ball
+from robo_rugby.gym_env.RR_Robot import Robot
+from robo_rugby.gym_env.RR_Goal import Goal
+import robo_rugby.gym_env.RR_TrashyPhysics as TrashyPhysics
 
 MyUtils.PRINT_STAGE = False  # Disable stage spam
 

@@ -1,10 +1,10 @@
 import pygame
 from pygame.sprite import Sprite
 from typing import List, Tuple
-import robo_rugby.env.RR_Constants as const
-from robo_rugby.env.RR_Robot import Robot
-from robo_rugby.env.RR_Ball import Ball
-from robo_rugby.env.RR_Goal import Goal
+import robo_rugby.gym_env.RR_Constants as const
+from robo_rugby.gym_env.RR_Robot import Robot
+from robo_rugby.gym_env.RR_Ball import Ball
+from robo_rugby.gym_env.RR_Goal import Goal
 from MyUtils import FloatRect, Point, Div0
 import math
 
