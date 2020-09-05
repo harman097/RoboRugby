@@ -1,11 +1,12 @@
 from __future__ import absolute_import, division, print_function
 from typing import List, Dict, Tuple
 import MyUtils
-from MyUtils import Stage
+from MyUtils import Stage, Point, FloatRect, RightTriangle
 import gym
 from gym.utils import seeding
 import pygame
 import math
+import random
 import RR_Constants as const
 import numpy as np
 import imageio
@@ -34,27 +35,48 @@ class GameEnv(gym.Env):
         'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second':const.FRAMERATE
     }
+    _h5 = const.ARENA_HEIGHT / 5
+    _w5 = const.ARENA_WIDTH / 5
+    CONFIG_RANDOM = None
+    CONFIG_STANDARD = [
+        [
+            (const.ARENA_WIDTH / 2 + 1 * _w5, const.ARENA_HEIGHT - 1 * _h5, 135),
+            (const.ARENA_WIDTH / 2 + 2 * _w5, const.ARENA_HEIGHT - 2 * _h5, 135),
+            (const.ARENA_WIDTH / 2 - 1 * _w5, 1 * _h5, 315),
+            (const.ARENA_WIDTH / 2 - 2 * _w5, 2 * _h5, 315)
+        ],
+        [
+            (_w5 * 1, const.ARENA_HEIGHT - _h5 * 1),
+            (_w5 * 2, const.ARENA_HEIGHT - _h5 * 2),
+            (_w5 * 3, const.ARENA_HEIGHT - _h5 * 3),
+            (_w5 * 4, const.ARENA_HEIGHT - _h5 * 4),
+            (const.ARENA_WIDTH / 2, _h5),
+            (const.ARENA_WIDTH / 2, const.ARENA_HEIGHT - _h5),
+            (_w5, const.ARENA_HEIGHT / 2),
+            (const.ARENA_WIDTH - _w5, const.ARENA_HEIGHT / 2)
+        ]
+    ]
 
     @property
     def lstHappyBots(self) -> List[Robot]:  # Happy bots in 1st half of list
-        return self.lstRobots[const.NUM_ROBOTS_HAPPY:]
+        return self.lstRobots[:const.NUM_ROBOTS_HAPPY]
 
     @property
     def lstGrumpyBots(self) -> List[Robot]:  # Grumpy bots in 2nd half of list
-        return self.lstRobots[:const.NUM_ROBOTS_HAPPY]
+        return self.lstRobots[const.NUM_ROBOTS_HAPPY:]
 
-    def __init__(self):
+    @property
+    def lstPosBalls(self) -> List[Ball]:  # Pos balls in 1st half of list
+        return self.lstBalls[:const.NUM_BALL_POS]
+
+    @property
+    def lstNegBalls(self) -> List[Ball]:  # Pos balls in 1st half of list
+        return self.lstBalls[const.NUM_BALL_POS:]
+
+    def __init__(self, lst_starting_config:List[Tuple[float,float]]=None):
         Stage("Initializing RoboRugby...")
         self.grpAllSprites = pygame.sprite.Group()
         self.lngStepCount = 0
-
-        # left wall, right wall, top wall, bottom wall - 100 px buffer
-        self.lstWalls = [
-            pygame.Rect(-100, -100, 100, const.ARENA_HEIGHT + 200),
-            pygame.Rect(const.ARENA_WIDTH, -100, 100, const.ARENA_HEIGHT + 200),
-            pygame.Rect(-100, -100, const.ARENA_WIDTH + 200, 100),
-            pygame.Rect(const.ARENA_HEIGHT, -100, const.ARENA_WIDTH + 200, 100)
-        ]
 
         Stage("Here are the goals")
         self.sprHappyGoal = Goal(const.TEAM_HAPPY)
@@ -65,45 +87,36 @@ class GameEnv(gym.Env):
         Stage("Bring out ze Robots!")
         self.grpRobots = pygame.sprite.Group()
         lngTotalRobots = const.NUM_ROBOTS_GRUMPY + const.NUM_ROBOTS_HAPPY
-        self.lstRobots = [0] * (lngTotalRobots)
+        self.lstRobots = [None] * lngTotalRobots  # type: List[Robot]
         for i in range(const.NUM_ROBOTS_HAPPY):
-            self.lstRobots[i] = Robot(const.TEAM_HAPPY)
-            while pygame.sprite.spritecollideany(self.lstRobots[i], self.grpAllSprites):
-                # Keep trying random start positions until there's no overlap
-                self.lstRobots[i] = Robot(const.TEAM_HAPPY)
+            self.lstRobots[i] = Robot(const.TEAM_HAPPY, (0,0))
             self.grpRobots.add(self.lstRobots[i])
             self.grpAllSprites.add(self.lstRobots[i])
-
         for i in range(const.NUM_ROBOTS_HAPPY, lngTotalRobots):
-            self.lstRobots[i] = Robot(const.TEAM_GRUMPY)
-            while pygame.sprite.spritecollideany(self.lstRobots[i], self.grpAllSprites):
-                # Keep trying random start positions until there's no overlap
-                self.lstRobots[i] = Robot(const.TEAM_GRUMPY)
+            self.lstRobots[i] = Robot(const.TEAM_GRUMPY, (0,0))
             self.grpRobots.add(self.lstRobots[i])
             self.grpAllSprites.add(self.lstRobots[i])
 
         Stage("Give it some balls!")
         self.grpBalls = pygame.sprite.Group()
-        self._lstPosBalls = [None] * const.NUM_BALL_POS  # type: List[Ball]
-        self._lstNegBalls = [None] * const.NUM_BALL_POS  # type: List[Ball]
+        lngTotalBalls = const.NUM_BALL_POS + const.NUM_BALL_NEG
+        self.lstBalls = [None] * lngTotalBalls  # type: List[Ball]
         for i in range(const.NUM_BALL_POS):
-            while True:  # Just make one until we have no initial collisions
-                objNewBall = Ball(const.COLOR_BALL_POS)
-                if pygame.sprite.spritecollideany(objNewBall, self.grpAllSprites) is None:
-                    break
-            self.grpBalls.add(objNewBall)
-            self.grpAllSprites.add(objNewBall)
-            self._lstPosBalls[i] = objNewBall
-
-        for i in range(const.NUM_BALL_NEG):
-            while True:  # Just make one until we have no initial collisions
-                objNewBall = Ball(const.COLOR_BALL_NEG)
-                if pygame.sprite.spritecollideany(objNewBall, self.grpAllSprites) is None:
-                    break
-            self.grpBalls.add(objNewBall)
-            self.grpAllSprites.add(objNewBall)
-            self._lstNegBalls[i] = objNewBall
-
+            self.lstBalls[i] = Ball(const.COLOR_BALL_POS, (0,0))
+            self.grpBalls.add(self.lstBalls[i])
+            self.grpAllSprites.add(self.lstBalls[i])          
+        for i in range(const.NUM_BALL_POS, lngTotalBalls):
+            self.lstBalls[i] = Ball(const.COLOR_BALL_NEG, (0,0))
+            self.grpBalls.add(self.lstBalls[i])
+            self.grpAllSprites.add(self.lstBalls[i])
+            
+        Stage("Set the starting positions")
+        if lst_starting_config is None:
+            self._lst_starting_positions = self._set_random_positions()
+        else:
+            self._lst_starting_positions = lst_starting_config
+            self._set_starting_positions()
+            
         self.dblBallDistSum = self._get_ball_distance_sum()
 
         # Minitaur gym is a good example of similar inputs/outputs
@@ -120,8 +133,98 @@ class GameEnv(gym.Env):
             # tip: '-' operator can be applied to numpy arrays (flips each element)
             GameEnv.action_space = gym.spaces.Box(-alngActions, alngActions, dtype=np.int)
 
-    def reset(self) -> np.ndarray:
-        # todo this should probly be a little... better
+    def _get_positions(self):
+        return [
+            list(map(lambda robot: (robot.rectDbl.centerx, robot.rectDbl.centery, robot.dblRotation), self.lstRobots)),
+            list(map(lambda ball: ball.rectDbl.center, self.lstBalls)),
+        ]
+
+    def _set_starting_positions(self):       
+        # Validate
+        if self._lst_starting_positions is None:
+            raise Exception("No starting configuration set.")        
+        if(len(self._lst_starting_positions) != 2):
+            raise Exception(f"Expected list of 2 lists. Not whatever this is: {self._lst_starting_positions}")
+        lst_robot_states = self._lst_starting_positions[0]
+        if len(lst_robot_states) != len(self.lstRobots):
+            raise Exception(f"Robot count mismatch. {len(self.lstRobots)} != {len(lst_robot_states)}.")
+        lst_ball_states = self._lst_starting_positions[1]
+        if len(lst_ball_states) != len(self.lstBalls):
+            raise Exception(f"Ball count mismatch. {len(self.lstBalls)} != {len(lst_ball_states)}.")
+
+        # Set robot position
+        for i in range(len(self.lstRobots)):
+            x, y, rot = lst_robot_states[i]  # unpack tuple
+            self.lstRobots[i].rectDbl.centerx = x
+            self.lstRobots[i].rectDbl.centery = y
+            self.lstRobots[i].dblRotation = rot
+
+        # Set ball position
+        for i in range(len(self.lstBalls)):
+            self.lstBalls[i].rectDbl.center = lst_ball_states[i]
+
+    def _set_random_positions(self) -> List[List[Tuple]]:
+        # reset all robots off map
+        for spr_robot in self.lstRobots:
+            spr_robot.centerx = spr_robot.centery = -1000
+
+        for spr_robot in self.lstHappyBots:
+            while True:
+                # Happy team starts in the bottom-right quad with 2-robots padding
+                spr_robot.rectDbl.centerx = random.randint(const.ARENA_WIDTH / 2 + const.ROBOT_WIDTH * 2,
+                                                   const.ARENA_WIDTH - const.ROBOT_WIDTH * 2)
+                spr_robot.rectDbl.centery = random.randint(const.ARENA_HEIGHT / 2 + const.ROBOT_LENGTH * 2,
+                                                   const.ARENA_HEIGHT - const.ROBOT_LENGTH * 2)
+                spr_robot.dblRotation = random.randint(0,360)
+                if len(pygame.sprite.spritecollide(spr_robot, self.grpRobots, False)) <= 1:
+                    break  # always collides with self
+
+        for spr_robot in self.lstGrumpyBots:
+            while True:
+                # Grumpy team starts in the top-left quad with 2-robots padding
+                spr_robot.rectDbl.centerx = random.randint(const.ROBOT_WIDTH * 2,
+                                                   const.ARENA_WIDTH / 2 - const.ROBOT_WIDTH * 2)
+                spr_robot.rectDbl.centery = random.randint(const.ROBOT_LENGTH * 2,
+                                                   const.ARENA_HEIGHT / 2 - const.ROBOT_LENGTH * 2)
+                spr_robot.dblRotation = random.randint(0, 360)
+                if len(pygame.sprite.spritecollide(spr_robot, self.grpRobots, False)) <= 1:
+                    break  # always collides with self
+
+        # reset all balls off map
+        for spr_ball in self.lstBalls:
+            spr_ball.rectDbl.centerx = spr_ball.rectDbl.centery = -1000
+
+        for spr_ball in self.lstPosBalls:
+            while True:
+                spr_ball.rectDbl.centerx = random.randint(const.ROBOT_WIDTH, const.ARENA_WIDTH - const.ROBOT_WIDTH)
+                spr_ball.rectDbl.centery = random.randint(const.ROBOT_WIDTH, const.ARENA_HEIGHT - const.ROBOT_WIDTH)
+                if len(pygame.sprite.spritecollide(spr_ball, self.grpAllSprites, False)) <= 1:
+                    break  # always collides with self
+
+        for spr_ball in self.lstNegBalls:
+            while True:
+                spr_ball.rectDbl.centerx = random.randint(const.ROBOT_WIDTH, const.ARENA_WIDTH - const.ROBOT_WIDTH)
+                spr_ball.rectDbl.centery = random.randint(const.ROBOT_WIDTH, const.ARENA_HEIGHT - const.ROBOT_WIDTH)
+                if len(pygame.sprite.spritecollide(spr_ball, self.grpAllSprites, False)) <= 1:
+                    break  # always collides with self
+                    
+        return self._get_positions()
+
+    def reset(self, bln_randomize_pos :bool = False) -> np.ndarray:
+        self.lngStepCount = 0
+        for spr_ball in self.lstBalls:
+            if not spr_ball.alive():
+                self.grpBalls.add(spr_ball)
+                self.grpAllSprites.add(spr_ball)
+        for sprSprite in self.grpAllSprites:
+            if hasattr(sprSprite, 'on_reset'):
+                sprSprite.on_reset()
+        if bln_randomize_pos:
+            self._set_random_positions()
+        else:
+            self._set_starting_positions()
+        self.dblBallDistSum = self._get_ball_distance_sum()
+
         return self._get_game_state()
 
     def render(self, mode='human'):
@@ -179,22 +282,6 @@ class GameEnv(gym.Env):
         for i in range(len(lstArgs)):
             self.lstRobots[i].set_thrust(lstArgs[i][0], lstArgs[i][1])
 
-        """
-        New pseudo, now that move_one() is viable
-        For _ in range(const.ROBOT_SPEED) (aka pixels to move per frame)
-            robots.move_one()
-            for each robot/robot collision
-                undo both of their latest moves
-                set movement speed to 0
-            for each robot/ball collision
-                impart velocity to the ball
-            balls.move_one()
-            for each ball/ball collision
-                bounce balls off each other
-            for each robot/ball collision
-                undo the robot movement (it hit the wall or another robot)        
-        """
-
         for _ in range(const.MOVES_PER_FRAME):
 
             # Typehint all the loop variables we're going to use
@@ -213,7 +300,6 @@ class GameEnv(gym.Env):
             Stage("Did they smash each other?")
             for sprRobot1, sprRobot2 in TrashyPhysics.collision_pairs_self(
                     self.grpRobots, fncCollided=TrashyPhysics.robots_collided):
-                # TODO logic on "who is at fault?" probly needs to be a bit better...
                 if sprRobot1.lngRThrust != 0 or sprRobot1.lngLThrust != 0:
                     setNaughtyRobots.add(sprRobot1)
                 if sprRobot2.lngRThrust != 0 or sprRobot2.lngLThrust != 0:
@@ -328,19 +414,17 @@ class GameEnv(gym.Env):
         :param intTeam: Is this the game state from happy team's perspective? or grumpy's?
         :return: numpy.ndarray
         """
-        if intTeam == const.TEAM_HAPPY:  # report happy balls first
+        if intTeam == const.TEAM_HAPPY:  # report happy bots first
             return np.concatenate((
                 list(map(self._robot_state, self.lstHappyBots)),
                 list(map(self._robot_state, self.lstGrumpyBots)),
-                list(map(self._ball_state, self._lstPosBalls)),
-                list(map(self._ball_state, self._lstNegBalls))
+                list(map(self._ball_state, self.lstBalls))
             ), axis=None)
-        else:  # report grumpy balls first
+        else:  # report grumpy bots first
             return np.concatenate((
                 list(map(self._robot_state, self.lstGrumpyBots)),
                 list(map(self._robot_state, self.lstHappyBots)),
-                list(map(self._ball_state, self._lstPosBalls)),
-                list(map(self._ball_state, self._lstNegBalls))
+                list(map(self._ball_state, self.lstBalls))
             ), axis=None)
 
     def _ball_state(self, sprBall :Ball) -> List[float]:
@@ -370,7 +454,7 @@ class GameEnv(gym.Env):
         
         # Higher score the farther away positive balls get from Grumpy's goal (and therefore closer to Happy's goal)
         # Lower score the farther away negative balls get from Grumpy's goal (and therefore closer to Happy's goal)
-        return sum(map(_dist, self._lstPosBalls)) - sum(map(_dist, self._lstNegBalls))
+        return sum(map(_dist, self.lstPosBalls)) - sum(map(_dist, self.lstNegBalls))
 
     # Add more things here as they come up
     class DebugInfo:
