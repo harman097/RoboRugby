@@ -6,7 +6,6 @@ Training environment for ML agents in a competitive robot rugby game using OpenA
 
 Pick a folder to store the project (ex. ~/Projects)
 
-
 Download project
 
 ```sh
@@ -17,17 +16,17 @@ Install dependencies
 
 ```sh
 cd /path/to/RoboRugby
-python3 -m venv venv
+python3 -m venv .venv
 ```
 
 On Windows, run:
-```venv\Scripts\activate.bat```
+```.venv\Scripts\activate.bat```
 
 On Unix or MacOS, run:
-```source venv/bin/activate```
+```source .venv/bin/activate```
 
 ```sh
-pip3 install gym pygame
+pip3 install -e .
 ```
 
 To deactivate the virtual environment (venv), run ```deactivate```, or close your terminal.
