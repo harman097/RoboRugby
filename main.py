@@ -5,8 +5,8 @@ import pygame
 import random
 import imageio
 import robo_rugby
-from robo_rugby.env.RoboRugby import GameEnv
-import robo_rugby.env.RR_Constants as const
+from robo_rugby.gym_env.RoboRugby import GameEnv
+import robo_rugby.gym_env.RR_Constants as const
 
 # Each frame of the game is driven by step()
 #
