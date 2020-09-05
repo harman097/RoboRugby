@@ -27,7 +27,7 @@ if blnRECORD:
     objVideoWriter = imageio.get_writer(strVideoFile, fps=RoboRugby.GameEnv.metadata['video.frames_per_second'])
 
 Stage("Start the game!")
-env = RoboRugby.GameEnv()
+env = RoboRugby.GameEnv(RoboRugby.GameEnv.CONFIG_STANDARD)
 blnRunGame = True
 while blnRunGame:
 
@@ -86,7 +86,7 @@ while blnRunGame:
         observation, reward, done, info  = env.step(lstInput)
 
         if done:
-            blnRunGame = False
+            # blnRunGame = False
 
             lngScoreHappy = env.sprHappyGoal.get_score()
             lngScoreGrumpy = env.sprGrumpyGoal.get_score()
@@ -98,6 +98,9 @@ while blnRunGame:
                 print("Tie!")
             else:
                 print("Team Grump Bot WINS!!!  ~~boo~~")
+
+            print("------ RESETTING --------")
+            env.reset(False)
 
     else:
         raise NotImplementedError("Training section not done.")

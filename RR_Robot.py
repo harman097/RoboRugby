@@ -7,6 +7,7 @@ import RR_Constants as const
 from MyUtils import FloatRect, Point
 
 class Robot(pygame.sprite.Sprite):
+    __instance_count = 0
 
     ssurfHappyRobot = pygame.image.load("Happy_Robot_40x20.png").convert()
     ssurfHappyRobot.set_colorkey((0,0,0), pygame.RLEACCEL)
@@ -54,8 +55,10 @@ class Robot(pygame.sprite.Sprite):
         return rectPrior
 
 
-    def __init__(self, intTeam):
+    def __init__(self, intTeam:int, tplCenter:Tuple[float,float]):
         super(Robot, self).__init__()
+        Robot.__instance_count += 1
+        self.__id = Robot.__instance_count
 
         self.intTeam = intTeam
         self.lngLThrust = 0
@@ -64,23 +67,21 @@ class Robot(pygame.sprite.Sprite):
 
         # self.rect = rendering (integers), self.dblRect = location calc (float)
         self.rectDbl = FloatRect(0, const.ROBOT_LENGTH, 0, const.ROBOT_WIDTH)
+        self.rectDbl.center = tplCenter
 
         if intTeam == const.TEAM_HAPPY:
             self.surfBase = Robot.ssurfHappyRobot
-            # Happy team starts in the bottom-right quad with 2-robots padding
-            self.rectDbl.centerx = random.randint(const.ARENA_WIDTH / 2 + const.ROBOT_WIDTH * 2, const.ARENA_WIDTH - const.ROBOT_WIDTH * 2)
-            self.rectDbl.centery = random.randint(const.ARENA_HEIGHT / 2 + const.ROBOT_LENGTH * 2, const.ARENA_HEIGHT - const.ROBOT_LENGTH * 2)
             self.rectDbl.rotation = Robot.slngHappyRobotInitialRot
         else:
             self.surfBase = Robot.ssurfGrumpyRobot
-            # Grumpy team starts in the top-left quad with 2-robots padding
-            self.rectDbl.centerx = random.randint(const.ROBOT_WIDTH * 2, const.ARENA_WIDTH / 2 - const.ROBOT_WIDTH * 2)
-            self.rectDbl.centery = random.randint(const.ROBOT_LENGTH * 2, const.ARENA_HEIGHT / 2 - const.ROBOT_LENGTH * 2)
             self.rectDbl.rotation = Robot.slngGrumpyRobotInitialRot
 
         self.rectDblPriorStep = self.rectDbl.copy()
         self.lngMoveCount = 0
         self._lstStates = [None]*self._slngMoveHistorySize # type: List[Tuple[float, float, float, int]]
+
+    def on_reset(self):
+        self.__init__(self.intTeam, self.rectDbl.center)
 
     def _store_state(self):
         self._lstStates[self.lngMoveCount % self._slngMoveHistorySize] = (
@@ -205,3 +206,8 @@ class Robot(pygame.sprite.Sprite):
             self.rectDbl.bottom = const.ARENA_HEIGHT
 
     #endregion
+
+    def __str__(self):
+        return f"Robot {self.__instance_count} {self.rectDbl.center}"
+    def __repr__(self):
+        return f"Robot {self.__instance_count} {self.rectDbl.center}"

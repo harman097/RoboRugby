@@ -44,6 +44,13 @@ class Goal(pygame.sprite.Sprite):
         self.dctPosBallsScored = {}
         self.dctNegBallsScored = {}
 
+    def on_reset(self):
+        self.lngFrameCount = 0
+        self.dctBallsCurrent = {}
+        self.dctBallsPrior = {}
+        self.dctPosBallsScored = {}
+        self.dctNegBallsScored = {}
+
     def on_step_begin(self):
         self.dctBallsCurrent = {}
         self.lngFrameCount += 1

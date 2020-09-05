@@ -2,10 +2,25 @@ import RR_Constants as const
 import pygame
 import random
 import math
+from typing import Tuple, Dict, List
 from MyUtils import FloatRect, Point
 
 class Ball(pygame.sprite.Sprite):
-    def __init__(self, tplColor):
+
+    @property
+    def rect(self) -> pygame.Rect:  # used by pygame for rendering (otherwise use
+        return pygame.Rect(
+            self.rectDbl.left,
+            self.rectDbl.top,
+            self.rectDbl.right - self.rectDbl.left,
+            self.rectDbl.bottom - self.rectDbl.top
+        )
+
+    @property
+    def radius(self) -> float:  # used by pygame to check circle collisions
+        return const.BALL_RADIUS
+
+    def __init__(self, tplColor:Tuple[int,int,int], tplCenter:Tuple[float,float]):
         super(Ball, self).__init__()
         self.dblXVelocity = 0
         self.dblYVelocity = 0
@@ -14,19 +29,10 @@ class Ball(pygame.sprite.Sprite):
         self.surf = pygame.Surface((const.BALL_RADIUS*2, const.BALL_RADIUS*2))
         self.surf.fill((255,255,255))
         self.surf.set_colorkey((255,255,255))
-        tplCenter = Point(  # Make sure the robot can get it off the wall
-                random.randint(const.ROBOT_WIDTH, const.ARENA_WIDTH - const.ROBOT_WIDTH),
-                random.randint(const.ROBOT_WIDTH, const.ARENA_HEIGHT - const.ROBOT_WIDTH)
-            )
-        # self.rect = self.surf.get_rect(center=(tplCenter))
-
-        # integer rect, used by pygame for rendering
-        self.rect = self.surf.get_rect(center=tplCenter)
-        self.radius = const.BALL_RADIUS  # used by pygame to check circle collisions
         pygame.draw.circle(self.surf, self.tplColor, (const.BALL_RADIUS, const.BALL_RADIUS), const.BALL_RADIUS)
 
-        # actual rect, used internally to calculate location
-        self.rectDbl = FloatRect(self.rect.left, self.rect.right, self.rect.top, self.rect.bottom)
+        self.rectDbl = FloatRect(0, self.surf.get_width(), 0, self.surf.get_height())
+        self.rectDbl.center = tplCenter
         self.rectDblPriorStep = self.rectDbl.copy()
         self.lngFrameMass = const.MASS_BALL
 
@@ -34,9 +40,13 @@ class Ball(pygame.sprite.Sprite):
         self.rectDblPriorStep = self.rectDbl.copy()
         self.lngFrameMass = const.MASS_BALL
 
-    def on_step_end(self):
-        AvoidConsoleSpam = 'Yes'
-        # print("Ball.on_step_end() not implemented.")
+    def on_reset(self):
+        # avoid calling __init__ for now, just so we don't redraw the surface
+        # if ball ever gets more complicated, though, can just call __init__
+        self.dblXVelocity = 0
+        self.dblYVelocity = 0
+        self.lngFrameMass = const.MASS_BALL
+        self.rectDblPriorStep = self.rectDbl.copy()
 
     def move(self):
         self.rectDbl.left += self.dblXVelocity
