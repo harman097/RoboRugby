@@ -89,9 +89,11 @@ class Robot(pygame.sprite.Sprite):
             self.lngMoveCount
         )
 
-    def set_thrust(self, lngLThrust, lngRThrust):
-        self.lngLThrust = lngLThrust
-        self.lngRThrust = lngRThrust
+    # todo once we get the robot, re-evaluate this
+    # Are the robot engines just "on" or "off"? or can you specify how much power?
+    def set_thrust(self, l_thrust: float, r_thrust: float):
+        self.lngLThrust = int(round(l_thrust))
+        self.lngRThrust = int(round(r_thrust))
 
     #region Movement
 

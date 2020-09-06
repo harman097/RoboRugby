@@ -27,7 +27,47 @@ MyUtils.PRINT_STAGE = False  # Disable stage spam
 # Avoid math.sin/cos and radian->degree conversion (cuz it's probly slow?)
 # (2) Can avoid pygame.transform.rotate calls entirely if we're not rendering (I'm assuming it's slow)
 
-# TODO properly inherit
+def get_tf_wrapped_robo_rugby_env():
+    """Wraps given gym environment with TF Agent's GymWrapper.
+      Note that by default a TimeLimit wrapper is used to limit episode lengths
+      to the default benchmarks defined by the registered environments.
+      Args:
+        gym_env: An instance of OpenAI gym environment.
+        discount: Discount to use for the environment.
+        max_episode_steps: Used to create a TimeLimitWrapper. No limit is applied
+          if set to None or 0. Usually set to `gym_spec.max_episode_steps` in `load.
+        gym_env_wrappers: Iterable with references to wrapper classes to use
+          directly on the gym environment.
+        time_limit_wrapper: Wrapper that accepts (env, max_episode_steps) params to
+          enforce a TimeLimit. Usuaully this should be left as the default,
+          wrappers.TimeLimit.
+        env_wrappers: Iterable with references to wrapper classes to use on the
+          gym_wrapped environment.
+        spec_dtype_map: A dict that maps gym specs to tf dtypes to use as the
+          default dtype for the tensors. An easy way how to configure a custom
+          mapping through Gin is to define a gin-configurable function that returns
+          desired mapping and call it in your Gin config file, for example:
+          `suite_gym.load.spec_dtype_map = @get_custom_mapping()`.
+        auto_reset: If True (default), reset the environment automatically after a
+          terminal state is reached.
+        render_kwargs: Optional `dict` of keywoard arguments for rendering.
+      Returns:
+        A PyEnvironment instance.
+      """
+    from tf_agents.environments import suite_gym
+    gym_spec = gym.spec("RoboRugby-v0")
+    gym_env = gym_spec.make()
+    return suite_gym.wrap_env(
+        gym_env,
+        discount=1.0,  # discount TODO research that more
+        max_episode_steps=gym_spec.max_episode_steps,
+        auto_reset=False)
+    # gym_env_wrappers=gym_env_wrappers,
+    # time_limit_wrapper=wrappers.TimeLimit,  # default
+    # env_wrappers=env_wrappers,
+    # spec_dtype_map=spec_dtype_map,
+
+
 class GameEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
@@ -71,7 +111,7 @@ class GameEnv(gym.Env):
     def lstNegBalls(self) -> List[Ball]:  # Pos balls in 1st half of list
         return self.lstBalls[const.NUM_BALL_POS:]
 
-    def __init__(self, lst_starting_config:List[Tuple[float,float]]=None):
+    def __init__(self, lst_starting_config:List[Tuple[float,float]] = CONFIG_STANDARD):
         Stage("Initializing RoboRugby...")
         self.grpAllSprites = pygame.sprite.Group()
         self.lngStepCount = 0
@@ -129,7 +169,8 @@ class GameEnv(gym.Env):
         if GameEnv.action_space is None:  # shared variable from base class, gym.Env()
             alngActions = np.array([1]*len(self.lstRobots)*2)
             # tip: '-' operator can be applied to numpy arrays (flips each element)
-            GameEnv.action_space = gym.spaces.Box(-alngActions, alngActions, dtype=np.int)
+            # TODO change this back to np.int
+            GameEnv.action_space = gym.spaces.Box(-alngActions, alngActions, dtype=np.float32)
 
     def _get_positions(self):
         return [
@@ -275,10 +316,12 @@ class GameEnv(gym.Env):
                 sprSprite.on_step_begin()
 
         Stage("Activate robot engines!")
-        if len(lstArgs) > const.NUM_ROBOTS_TOTAL:
-            raise Exception(f"{len(lstArgs)} commands but only {const.NUM_ROBOTS_TOTAL} robots.")
-        for i in range(len(lstArgs)):
-            self.lstRobots[i].set_thrust(lstArgs[i][0], lstArgs[i][1])
+        # flatten args into 1-D array, if they're not already (tf passes like this)
+        arr_args = np.concatenate(lstArgs, axis=None)
+        if len(arr_args) > const.NUM_ROBOTS_TOTAL * 2:
+            raise Exception(f"{len(arr_args)} commands but only {const.NUM_ROBOTS_TOTAL*2} robot engines.")
+        for i in range(0, len(arr_args), 2):
+            self.lstRobots[int(i/2)].set_thrust(arr_args[i], arr_args[i+1])
 
         for _ in range(const.MOVES_PER_FRAME):
 
