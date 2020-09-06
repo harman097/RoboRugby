@@ -28,7 +28,7 @@ if blnRECORD:
     objVideoWriter = imageio.get_writer(strVideoFile, fps=GameEnv.metadata['video.frames_per_second'])
 
 Stage("Start the game!")
-env = GameEnv(GameEnv.CONFIG_STANDARD)
+env = GameEnv()
 blnRunGame = True
 while blnRunGame:
 
