@@ -138,7 +138,7 @@ with objStrategy.scope():
 
     tf_agent.initialize()
 
-print(f" --  REPLAY BUFFER  {now()}  -- ")
+print(f" --  REPLAY BUFFER  ({now()})  -- ")
 rate_limiter = reverb.rate_limiters.SampleToInsertRatio(
     samples_per_insert=3.0, min_size_to_sample=3, error_buffer=3.0
 )
@@ -162,14 +162,14 @@ dataset = reverb_replay.as_dataset(
       sample_batch_size=HyperParms.batch_size, num_steps=2).prefetch(50)
 experience_dataset_fn = lambda: dataset
 
-print(f" --  POLICIES  {now()}  -- ")
+print(f" --  POLICIES  ({now()})  -- ")
 tf_eval_policy = tf_agent.policy
 eval_policy = py_tf_eager_policy.PyTFEagerPolicy(tf_eval_policy, use_tf_function=True)
 tf_collect_policy = tf_agent.collect_policy
 collect_policy = py_tf_eager_policy.PyTFEagerPolicy(tf_collect_policy, use_tf_function=True)
 random_policy = random_py_policy.RandomPyPolicy(collect_env.time_step_spec(), collect_env.action_spec())
 
-print(f" --  ACTORS  {now()}  -- ")
+print(f" --  ACTORS  ({now()})  -- ")
 rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
   reverb_replay.py_client,
   table_name,
@@ -203,7 +203,7 @@ eval_actor = actor.Actor(
   summary_dir=os.path.join(tempdir, 'eval'),
 )
 
-print(f" --  LEARNERS  {now()}  -- ")
+print(f" --  LEARNERS  ({now()})  -- ")
 saved_model_dir = os.path.join(tempdir, learner.POLICY_SAVED_MODEL_DIR)
 
 # Triggers to save the agent's policy checkpoints.
@@ -217,13 +217,13 @@ learning_triggers = [
 ]
 
 agent_learner = learner.Learner(
-  tempdir,
-  train_step,
-  tf_agent,
-  experience_dataset_fn,
-  triggers=learning_triggers)
+    tempdir,
+    train_step,
+    tf_agent,
+    experience_dataset_fn,
+    triggers=learning_triggers)
 
-print(f" --  METRICS AND EVALUATION  {now()}  -- ")
+print(f" --  METRICS AND EVALUATION  ({now()})  -- ")
 def get_eval_metrics():
   eval_actor.run()
   results = {}
@@ -240,7 +240,7 @@ def log_eval_metrics(step, metrics):
 
 log_eval_metrics(0, metrics)
 
-print(f" --  TRAINING  {now()}  -- ")
+print(f" --  TRAINING  ({now()})  -- ")
 
 # Reset the train step
 tf_agent.train_step_counter.assign(0)
@@ -249,7 +249,7 @@ tf_agent.train_step_counter.assign(0)
 avg_return = metrics["AverageReturn"]  # didn't we already do this? get_eval_metrics()["AverageReturn"]
 returns = [avg_return]
 
-print(f" --  LET US BEGIN! {now()}  -- ")
+print(f" --  LET US BEGIN! ({now()})  -- ")
 for progress in range(HyperParms.num_iterations):
     sys.stdout.write("Iteration num: %d%%  \r" % (progress))
     sys.stdout.flush()
@@ -271,7 +271,7 @@ for progress in range(HyperParms.num_iterations):
 rb_observer.close()
 reverb_server.stop()
 
-print(f" --  VISUALIZATION  {now()}  -- ")
+print(f" --  VISUALIZATION  ({now()})  -- ")
 
 steps = range(0, HyperParms.num_iterations + 1, HyperParms.eval_interval)
 plt.plot(steps, returns)

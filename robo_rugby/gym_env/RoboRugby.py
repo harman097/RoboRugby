@@ -498,8 +498,9 @@ class GameEnv(gym.Env):
         return sum(map(_dist, self.lstPosBalls)) - sum(map(_dist, self.lstNegBalls))
 
     # Add more things here as they come up
-    class DebugInfo:
+    class DebugInfo(dict):
         def __init__(self, adblGrumpyState:np.ndarray, dblGrumpyScore:float):
+            super(GameEnv.DebugInfo, self).__init__()
             self.adblGrumpyState = adblGrumpyState  #type: np.ndarray
             self.dblGrumpyScore = dblGrumpyScore  #type: float
 
