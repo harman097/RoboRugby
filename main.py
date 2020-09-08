@@ -30,6 +30,7 @@ if blnRECORD:
 Stage("Start the game!")
 env = GameEnv()
 blnRunGame = True
+total_reward = 0
 while blnRunGame:
 
     if blnPLAYER:
@@ -85,6 +86,7 @@ while blnRunGame:
             lstInput.append(action)
 
         observation, reward, done, info  = env.step(lstInput)
+        total_reward += reward
 
         if done:
             # blnRunGame = False
@@ -100,7 +102,10 @@ while blnRunGame:
             else:
                 print("Team Grump Bot WINS!!!  ~~boo~~")
 
+            print(f"Reward: {total_reward}")
+
             print("------ RESETTING --------")
+            total_reward = 0
             env.reset(False)
 
     else:

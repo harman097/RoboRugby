@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from typing import List
 import sys
+import datetime
 
 
 class ReplayBuffer():
@@ -394,6 +395,8 @@ def plot_learning_curve(x, scores, figure_file):
     plt.title('Running average of previous 100 scores')
     plt.savefig(figure_file)
 
+def now() -> str:
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # region Actual training portion
 
@@ -407,13 +410,15 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
         os.makedirs('tmp/sac')
 
     # if the constants aren't really constant, def need to change prior to loading env
-    robo_rugby.const.GAME_LENGTH_MINS = .5  # slowwwwwwww af
+    # robo_rugby.const.GAME_LENGTH_MINS = .5  # slowwwwwwww af
+    robo_rugby.const.GAME_LENGTH_MINS = .15 # 9 seconds to push balls
+    robo_rugby.const.GAME_LENGTH_STEPS = robo_rugby.const.GAME_LENGTH_MINS * 60 * robo_rugby.const.FRAMERATE
 
     # env = gym.make('InvertedPendulumBulletEnv-v0')
     env = gym.make('RoboRugby-v0')
     agent = Agent(input_dims=env.observation_space.shape, env=env,
                   n_actions=env.action_space.shape[0])
-    n_games = 1000 # 250
+    n_games = 500 # 250 ~12 per hour @ 3 mins
     # uncomment this line and do a mkdir tmp && mkdir video if you want to
     # record video of the agent playing the game.
     # env = wrappers.Monitor(env, 'tmp/video', video_callable=lambda episode_id: True, force=True)
@@ -429,12 +434,13 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
         agent.load_models()
         env.render(mode='human')
 
-    print("Begin training...")
+    print(f"Begin training ({now()})...")
     for i in range(n_games):
         observation = env.reset()
         done = False
         score = 0
         step_num = 0
+        # print(f"Episode start: {now()}")
         while not done:
             step_num += 1
             sys.stdout.write("episode %d, Step num: %d  \r" % (i, step_num))
@@ -455,7 +461,7 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
             if not load_checkpoint:
                 agent.save_models()
 
-        print('episode ', i, 'score %.1f' % score, 'avg_score %.1f' % avg_score)
+        print('episode %d (%s)' % (i, now()), 'avg_score %.1f' % avg_score, 'total_steps %d' % step_num, 'score %.1f' % score)
 
     if not load_checkpoint:
         x = [i + 1 for i in range(n_games)]
