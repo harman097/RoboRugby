@@ -242,12 +242,18 @@ class FloatRect:
     def contains_point(self, tplPoint: Tuple[float,float]) -> bool:
         dblX, dblY = tplPoint # unpack
         if (self.left <= dblX <= self.right) and (self.top <= dblY <= self.bottom):
-            if self.rotation % 90 < 1:
+            if round(self.rotation % 90) == 0 or round(self.rotation % 90) == 90:
                 return True
             else:
+                set_x = set()
+                set_y = set()
                 for shpTriangle in self.sides_as_right_triangles():
+                    set_x.add(shpTriangle.tpl90.x)
+                    set_y.add(shpTriangle.tpl90.y)
                     if shpTriangle.contains_point(tplPoint):
                         return True
+                # check inner square (if valid) yoyo
+                return (min(set_x) <= dblX <= max(set_x)) and (min(set_y) <= dblY <= max(set_y))
         else:
             return False
 
