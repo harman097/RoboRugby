@@ -252,7 +252,7 @@ class FloatRect:
                     set_y.add(shpTriangle.tpl90.y)
                     if shpTriangle.contains_point(tplPoint):
                         return True
-                # check inner square (if valid)
+                # check inner square (if valid) yoyo
                 return (min(set_x) <= dblX <= max(set_x)) and (min(set_y) <= dblY <= max(set_y))
         else:
             return False
