@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function
 from typing import List, Tuple
 import MyUtils
-from MyUtils import Stage
+from MyUtils import Stage, Point, FloatRect
 import gym
 from gym.utils import seeding
 import pygame
@@ -309,6 +309,7 @@ class GameEnv(gym.Env):
         dblGrumpyScore = -1 * const.POINTS_TIME_PENALTY
         dblHappyScore = -1 * const.POINTS_TIME_PENALTY
         setNaughtyRobots = set()
+        setBallsInGoal = set()
 
         Stage("Prep ze sprites!")
         for sprSprite in self.grpAllSprites:
@@ -374,9 +375,32 @@ class GameEnv(gym.Env):
                     self.grpBalls, self.grpRobots, fncCollided=TrashyPhysics.ball_robot_collided):
                 sprRobot.undo_move()
 
-        Stage("Flag balls in the goal")
+        Stage("Flag balls in the goal") # todo not this
         self.sprHappyGoal.track_balls(self.grpBalls.sprites())
         self.sprGrumpyGoal.track_balls(self.grpBalls.sprites())
+
+        # todo give them immediate points upon scoring (for now)
+        for sprBall in self.lstPosBalls:
+
+            # todo re-enable goal scoring eventually
+            if self.sprHappyGoal.triShape.contains_point(sprBall.rectDbl.center):
+                # dblHappyScore += const.POINTS_BALL_SCORED
+                # dblGrumpyScore -= const.POINTS_BALL_SCORED
+                setBallsInGoal.add(sprBall)
+            elif self.sprGrumpyGoal.triShape.contains_point(sprBall.rectDbl.center):
+                # dblHappyScore -= const.POINTS_BALL_SCORED
+                # dblGrumpyScore += const.POINTS_BALL_SCORED
+                setBallsInGoal.add(sprBall)
+
+        for sprBall in self.lstNegBalls:
+            if self.sprHappyGoal.triShape.contains_point(sprBall.rectDbl.center):
+                # dblHappyScore -= const.POINTS_BALL_SCORED
+                # dblGrumpyScore += const.POINTS_BALL_SCORED
+                setBallsInGoal.add(sprBall)
+            elif self.sprGrumpyGoal.triShape.contains_point(sprBall.rectDbl.center):
+                # dblHappyScore += const.POINTS_BALL_SCORED
+                # dblGrumpyScore -= const.POINTS_BALL_SCORED
+                setBallsInGoal.add(sprBall)
         
         Stage("Flag robots in goals")
         for sprRobot in self.lstRobots:
@@ -423,8 +447,33 @@ class GameEnv(gym.Env):
         dblBallDistSumStart = self.dblBallDistSum
         self.dblBallDistSum = self._get_ball_distance_sum()
         dblDelta = const.POINTS_BALL_TRAVEL_MULT * (self.dblBallDistSum - dblBallDistSumStart)
+        # dblDelta += abs(dblDelta) # let's incentivize movement HEAVILY for the moment
         dblHappyScore += dblDelta  # ball travel points are zero-sum
         dblGrumpyScore -= dblDelta
+
+        Stage("Award points for robot travel")  # todo also fairly trash
+        def dist(tpl1 :Point, tpl2 :Point):
+            return math.pow((tpl1[0] - tpl2[0])**2 + (tpl1[1] - tpl2[1])**2, .5)
+
+        for sprRobot in self.lstRobots:
+            ball_nearest = None
+            for sprBall in self.lstBalls:
+                if sprBall in setBallsInGoal:
+                    """ignore"""
+                elif ball_nearest is None:
+                    ball_nearest = sprBall
+                else:
+                    if dist(sprRobot.rectDbl.center, sprBall.rectDbl.center) < \
+                        dist(sprRobot.rectDbl.center, ball_nearest.rectDbl.center):
+                        ball_nearest = sprBall
+
+            dist_now = dist(sprRobot.rectDbl.center, ball_nearest.rectDbl.center)
+            dist_prior = dist(sprRobot.rectDblPriorStep.center, ball_nearest.rectDbl.center)
+            points = (dist_prior - dist_now) * const.POINTS_ROBOT_TRAVEL_MULT
+            if sprRobot.intTeam == const.TEAM_HAPPY:
+                dblHappyScore += points
+            else:
+                dblGrumpyScore += points
 
         Stage("Anybody win?")
         if self.sprHappyGoal.is_destroyed():

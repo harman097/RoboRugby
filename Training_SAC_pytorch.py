@@ -16,6 +16,7 @@ from typing import List
 import sys
 import datetime
 
+# region SAC Implementation
 
 class ReplayBuffer():
     def __init__(self, max_size, input_shape, n_actions):
@@ -398,6 +399,8 @@ def plot_learning_curve(x, scores, figure_file):
 def now() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+# endregion
+
 # region Actual training portion
 
 if __name__ == '__main__':  # todo google this... like no idea wtf the point of this is
@@ -409,16 +412,19 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
     if not os.path.exists('tmp/sac'):
         os.makedirs('tmp/sac')
 
-    # if the constants aren't really constant, def need to change prior to loading env
-    # robo_rugby.const.GAME_LENGTH_MINS = .5  # slowwwwwwww af
-    robo_rugby.const.GAME_LENGTH_MINS = .15 # 9 seconds to push balls
-    robo_rugby.const.GAME_LENGTH_STEPS = robo_rugby.const.GAME_LENGTH_MINS * 60 * robo_rugby.const.FRAMERATE
+    # YOU CAN'T DO THIS!!! THE constants need to stay constant
+    # robo_rugby.const.GAME_LENGTH_MINS = .15 # 9 seconds to push balls
+    # robo_rugby.const.GAME_LENGTH_STEPS = robo_rugby.const.GAME_LENGTH_MINS * 60 * robo_rugby.const.FRAMERATE
 
     # env = gym.make('InvertedPendulumBulletEnv-v0')
     env = gym.make('RoboRugby-v0')
     agent = Agent(input_dims=env.observation_space.shape, env=env,
                   n_actions=env.action_space.shape[0])
-    n_games = 500 # 250 ~12 per hour @ 3 mins
+    """
+    ~12 per hour @ 3 min games
+    ~240 per hour @ 9s games
+    """
+    n_games = 5000 # 250 ~12 per hour @ 3 mins
     # uncomment this line and do a mkdir tmp && mkdir video if you want to
     # record video of the agent playing the game.
     # env = wrappers.Monitor(env, 'tmp/video', video_callable=lambda episode_id: True, force=True)
@@ -429,6 +435,7 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
     best_score = env.reward_range[0]
     score_history = []
     load_checkpoint = False
+    bln_render = True
 
     if load_checkpoint:
         agent.load_models()
@@ -453,6 +460,10 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
             if not load_checkpoint:
                 agent.learn()
             observation = observation_
+
+            if bln_render:
+                env.render()
+
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
 
