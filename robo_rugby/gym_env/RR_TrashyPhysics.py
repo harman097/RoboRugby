@@ -51,7 +51,7 @@ def ball_robot_collided(sprBall: Ball, sprRobot: Robot) -> bool:
     of the robot is inside the robot.
     """
     _rectBallInner.center = sprBall.rectDbl.center
-    if sprRobot.dblRotation % 90 == 0:
+    if round(sprRobot.dblRotation % 90) == 0 or round(sprRobot.dblRotation % 90) == 90:
         # robot is pure rect.
         # "Tangent" points of the ball for 0,90,180,270 occur at 45 rot (or equiv)
         _rectBallInner.rotation = 45
