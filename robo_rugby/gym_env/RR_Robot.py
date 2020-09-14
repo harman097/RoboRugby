@@ -5,6 +5,7 @@ import robo_rugby.gym_env.RR_Constants as const
 from MyUtils import FloatRect
 
 class Robot(pygame.sprite.Sprite):
+
     __instance_count = 0
 
     ssurfHappyRobot = pygame.image.load("robo_rugby/resources/Happy_Robot_40x20.png").convert()
@@ -58,6 +59,7 @@ class Robot(pygame.sprite.Sprite):
         Robot.__instance_count += 1
         self.__id = Robot.__instance_count
 
+        self.bln_allow_wall_sliding = False
         self.intTeam = intTeam
         self.lngLThrust = 0
         self.lngRThrust = 0
@@ -171,22 +173,34 @@ class Robot(pygame.sprite.Sprite):
                 )
                 self._move_angular(lngAngularVel, tplCenterRot, 90)
 
-    def _move_linear(self, lngVel):
+    def _move_linear(self, lngVel:int):
         dblRotRadians = math.radians(self.dblRotation)
+        tplCenterPrior = self.rectDbl.center
         self.rectDbl.left += math.cos(dblRotRadians) * float(lngVel)
         self.rectDbl.top += math.sin(dblRotRadians) * float(lngVel) * -1
 
-        # If we drive into the wall at an angle, let's pretend it's fine to "slide" along
+        bln_hit_wall = False
         if self.rectDbl.left < 0:
             self.rectDbl.left = 0
+            bln_hit_wall = True
         if self.rectDbl.right > const.ARENA_WIDTH:
             self.rectDbl.right = const.ARENA_WIDTH
+            bln_hit_wall = True
         if self.rectDbl.top <= 0:
             self.rectDbl.top = 0
+            bln_hit_wall = True
         if self.rectDbl.bottom >= const.ARENA_HEIGHT:
             self.rectDbl.bottom = const.ARENA_HEIGHT
+            bln_hit_wall = True
 
-    def _move_angular(self, dblAngularVel:float, tplCenterRot:Tuple[float,float]=None, dblTrackToCenterAngleAdj:float=0):
+        if bln_hit_wall and not self.bln_allow_wall_sliding:
+            self.rectDbl.center = tplCenterPrior
+
+    def _move_angular(self, dblAngularVel:float,
+                      tplCenterRot:Tuple[float,float] = None,
+                      dblTrackToCenterAngleAdj:float = 0):
+        dblRotationPrior = dblAngularVel
+        tplCenterPrior = self.rectDbl.center
         self.dblRotation += dblAngularVel
 
         if tplCenterRot:  # We're not rotating in place. Adjust rect center accordingly.
@@ -194,16 +208,25 @@ class Robot(pygame.sprite.Sprite):
             self.rectDbl.centerx = tplCenterRot[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians)
             self.rectDbl.centery = tplCenterRot[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
 
-        # If we rotate into the wall... fuck it, just pop ourselves out for now
-        # TODO probly don't actually do this though
+        bln_hit_wall = False
         if self.rectDbl.left < 0:
             self.rectDbl.left = 0
+            bln_hit_wall = True
         if self.rectDbl.right > const.ARENA_WIDTH:
             self.rectDbl.right = const.ARENA_WIDTH
+            bln_hit_wall = True
         if self.rectDbl.top <= 0:
             self.rectDbl.top = 0
+            bln_hit_wall = True
         if self.rectDbl.bottom >= const.ARENA_HEIGHT:
             self.rectDbl.bottom = const.ARENA_HEIGHT
+            bln_hit_wall = True
+
+        if bln_hit_wall and not self.bln_allow_wall_sliding:
+            self.rectDbl.center = tplCenterPrior
+            self.rectDbl.rotation = dblRotationPrior
+
+
 
     #endregion
 

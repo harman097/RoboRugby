@@ -11,8 +11,6 @@ import robo_rugby
 import gym
 from gym import wrappers
 import matplotlib.pyplot as plt
-
-from typing import List
 import sys
 import datetime
 
@@ -243,7 +241,7 @@ class ActorNetwork(nn.Module):
 
 
 class Agent():
-    def __init__(self, alpha=0.0003, beta=0.0003, input_dims=[8],
+    def __init__(self, alpha=0.0001, beta=0.0001, input_dims=[8],
                  env=None, gamma=0.99, n_actions=2, max_size=1000000, tau=0.005,
                  layer1_size=256, layer2_size=256, batch_size=256, reward_scale=2):
         """
@@ -331,6 +329,8 @@ class Agent():
         """
         if self.memory.mem_cntr < self.batch_size:
             return  # Not ready for self reflection. Keep training.
+        elif self.memory.mem_cntr == self.batch_size:
+            print(" -- Batch size reached. Learning can begin. -- ")
 
         state, action, reward, new_state, done = \
             self.memory.sample_buffer(self.batch_size)  # get a random portion of the buffer... but not the whole thing?
@@ -417,7 +417,8 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
     # robo_rugby.const.GAME_LENGTH_STEPS = robo_rugby.const.GAME_LENGTH_MINS * 60 * robo_rugby.const.FRAMERATE
 
     # env = gym.make('InvertedPendulumBulletEnv-v0')
-    env = gym.make('RoboRugby-v0')
+    # env = gym.make('RoboRugby-v0')
+    env = gym.make('RoboRugby_Discrete-v0')
     agent = Agent(input_dims=env.observation_space.shape, env=env,
                   n_actions=env.action_space.shape[0])
     """
@@ -466,13 +467,17 @@ if __name__ == '__main__':  # todo google this... like no idea wtf the point of 
 
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
+        if not load_checkpoint and i > 0 and i % 200 == 0:
+            agent.save_models()
 
-        if avg_score > best_score:
-            best_score = avg_score
-            if not load_checkpoint:
-                agent.save_models()
+        # if i > 20:  # wait till we have a few rounds under our belt
+        #     avg_score = np.mean(score_history[-100:])
+        #     if avg_score > best_score:
+        #         best_score = avg_score
+        #         if not load_checkpoint:
+        #             agent.save_models()
 
-        print('episode %d (%s)' % (i, now()), 'avg_score %.1f' % avg_score, 'total_steps %d' % step_num, 'score %.1f' % score)
+        print('episode %d ' % i, 'avg_score %.1f' % avg_score, 'score %.1f' % score)
 
     if not load_checkpoint:
         x = [i + 1 for i in range(n_games)]

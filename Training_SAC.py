@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function
 from MyUtils import Stage
 import pygame
 import random
-from robo_rugby.gym_env.RoboRugby import get_tf_wrapped_robo_rugby_env
+from robo_rugby.gym_env.RR_Environments import get_tf_wrapped_robo_rugby_env
 import robo_rugby.gym_env.RR_Constants as const
 
 import base64

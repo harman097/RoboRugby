@@ -26,6 +26,16 @@ def Div0(pdblNumerator: float, pdblDenominator: float) -> float:
 
 Point = namedtuple('Point', ['x', 'y'])
 
+def distance(tplA :Tuple[float,float], tplB :Tuple[float,float]) -> float:
+    return math.pow((tplB[0] - tplA[0])**2 + (tplB[1] - tplA[1])**2, .5)
+
+# These are defined with ccw rotation = positive, y-axis inverted (aka totally fucked, fix later if you want)
+def angle_degrees(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float:
+    return math.degrees(math.tanh(tpl_b[0] - tpl_a[0] / tpl_a[1] - tpl_b[1]))
+
+def angle_radians(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float:
+    return math.tanh(tpl_b[0] - tpl_a[0] / tpl_a[1] - tpl_b[1])
+
 # pygame rects are just ints, unfortunately, which makes any physics difficult
 class FloatRect:
 

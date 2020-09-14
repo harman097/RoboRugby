@@ -8,3 +8,11 @@ register(
     nondeterministic=True,  # opposing team will pretty much always be nondeterministic
     reward_threshold=1.0  # no idea
 )
+
+register(
+    id='RoboRugbySimple-v0',
+    entry_point='robo_rugby.gym_env.RR_Environments:SimpleChasePos',
+    max_episode_steps=const.GAME_LENGTH_STEPS,
+    nondeterministic=True,  # opposing team will pretty much always be nondeterministic
+    reward_threshold=1.0  # no idea
+)
