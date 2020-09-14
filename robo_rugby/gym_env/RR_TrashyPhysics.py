@@ -2,18 +2,15 @@ import pygame
 from pygame.sprite import Sprite
 from typing import List, Tuple
 import robo_rugby.gym_env.RR_Constants as const
-from robo_rugby.gym_env.RR_Robot import Robot
-from robo_rugby.gym_env.RR_Ball import Ball
-from robo_rugby.gym_env.RR_Goal import Goal
 from MyUtils import FloatRect, Point, Div0
 import math
 
-def robot_in_goal(sprRobot: Robot, sprGoal: Goal) -> bool:
+def robot_in_goal(sprRobot: 'Robot', sprGoal: 'Goal') -> bool:
     for tplCorner in sprRobot.rectDbl.corners:
         if sprGoal.triShape.contains_point(tplCorner):
             return True
 
-def robots_collided(sprRobot1: Robot, sprRobot2: Robot) -> bool:
+def robots_collided(sprRobot1: 'Robot', sprRobot2: 'Robot') -> bool:
     if sprRobot1.rectDbl.contains_point(sprRobot2.rectDbl.center):
         return True
 
@@ -41,7 +38,7 @@ _rectBallInner = FloatRect(
 )
 _dblBallRadius_Sq = const.BALL_RADIUS * const.BALL_RADIUS
 
-def ball_robot_collided(sprBall: Ball, sprRobot: Robot) -> bool:
+def ball_robot_collided(sprBall: 'Ball', sprRobot: 'Robot') -> bool:
     if not pygame.sprite.collide_rect(sprRobot, sprBall):
         return False
 
@@ -90,7 +87,7 @@ def ball_robot_collided(sprBall: Ball, sprRobot: Robot) -> bool:
     return False
 
 
-def balls_collided(spr1: Ball, spr2: Ball):
+def balls_collided(spr1: 'Ball', spr2: 'Ball'):
     return pygame.sprite.collide_circle(spr1, spr2)
 
 def collided_wall(objEntity) -> bool:
@@ -104,7 +101,7 @@ def collided_wall(objEntity) -> bool:
            rect.top < 0 or\
            rect.bottom > const.ARENA_HEIGHT
 
-def apply_force_to_ball(sprRobot: Robot, sprBall: Ball) -> None:
+def apply_force_to_ball(sprRobot: 'Robot', sprBall: 'Ball') -> None:
 
         # Trashy trash solely so it's interesting, for the moment
         rectPrior = sprRobot.rectDblPriorFrame
@@ -160,7 +157,7 @@ def apply_force_to_ball(sprRobot: Robot, sprBall: Ball) -> None:
         else:
             """Ball hit the wall or another robot. Don't budge."""
 
-def bounce_balls(spr1: Ball, spr2: Ball) -> None:
+def bounce_balls(spr1: 'Ball', spr2: 'Ball') -> None:
     if spr1.rectDbl.center == spr2.rectDbl.center:
         raise Exception("Really tho?? The balls are in the EXACT same spot????")
 
