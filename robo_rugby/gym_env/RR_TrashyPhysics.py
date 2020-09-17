@@ -1,7 +1,7 @@
 import pygame
 from pygame.sprite import Sprite
 from typing import List, Tuple
-import robo_rugby.gym_env.RR_Constants as const
+from . import RR_Constants as const
 from MyUtils import FloatRect, Point, Div0
 import math
 

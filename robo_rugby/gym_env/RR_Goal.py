@@ -1,5 +1,5 @@
 import pygame
-import robo_rugby.gym_env.RR_Constants as const
+from . import RR_Constants as const
 from typing import List
 from robo_rugby.gym_env.RR_Ball import Ball
 from MyUtils import RightTriangle, Point
