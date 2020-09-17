@@ -1,7 +1,7 @@
 import pygame
 from typing import Tuple, List
 import math
-import robo_rugby.gym_env.RR_Constants as const
+from . import RR_Constants as const
 from MyUtils import FloatRect
 
 class Robot(pygame.sprite.Sprite):

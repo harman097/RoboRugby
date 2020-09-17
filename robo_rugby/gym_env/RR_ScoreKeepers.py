@@ -1,7 +1,7 @@
 from robo_rugby.gym_env.RR_Robot import Robot
-import robo_rugby.gym_env.RR_TrashyPhysics as TrashyPhysics
+from . import RR_TrashyPhysics as TrashyPhysics
 from robo_rugby.gym_env.RR_EnvBase import GameEnv
-import robo_rugby.gym_env.RR_Constants as const
+from . import RR_Constants as const
 from MyUtils import distance
 from typing import Set, List, Tuple
 

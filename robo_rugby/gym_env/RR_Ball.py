@@ -1,4 +1,4 @@
-import robo_rugby.gym_env.RR_Constants as const
+from . import RR_Constants as const
 import pygame
 from typing import Tuple
 from MyUtils import FloatRect
