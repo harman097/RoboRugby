@@ -28,6 +28,9 @@ if blnRECORD:
     objVideoWriter = imageio.get_writer(strVideoFile, fps=GameEnv.metadata['video.frames_per_second'])
 
 Stage("Start the game!")
+if not const.GAME_MODE:
+    """ If anyone has a better way of managing this, I'm all ears. Doing this for now since it's easiest. """
+    print("WARNING: RoboRugby constants aren't set for game mode. Turn on the GAME_MODE flag in RR_Constants.")
 env = GameEnv()
 blnRunGame = True
 total_reward = 0
