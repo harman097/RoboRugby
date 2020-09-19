@@ -49,7 +49,9 @@ class Robot(pygame.sprite.Sprite):
         rectPrior = self.rectDbl.copy()
         rectPrior.centerx, rectPrior.centery, rectPrior.rotation, lngMC = self._lstStates[lngI]
         if lngMC != self.lngMoveCount - 1:
-            raise Exception(f"How...? {lngMC} != {self.lngMoveCount - 1}")
+            # raise Exception(f"How...? {lngMC} != {self.lngMoveCount - 1}")
+            print(f"How...? {lngMC} != {self.lngMoveCount - 1}")
+            return self.rectDbl.copy()
 
         return rectPrior
 
@@ -179,22 +181,23 @@ class Robot(pygame.sprite.Sprite):
         self.rectDbl.left += math.cos(dblRotRadians) * float(lngVel)
         self.rectDbl.top += math.sin(dblRotRadians) * float(lngVel) * -1
 
-        bln_hit_wall = False
-        if self.rectDbl.left < 0:
-            self.rectDbl.left = 0
-            bln_hit_wall = True
-        if self.rectDbl.right > const.ARENA_WIDTH:
-            self.rectDbl.right = const.ARENA_WIDTH
-            bln_hit_wall = True
-        if self.rectDbl.top <= 0:
-            self.rectDbl.top = 0
-            bln_hit_wall = True
-        if self.rectDbl.bottom >= const.ARENA_HEIGHT:
-            self.rectDbl.bottom = const.ARENA_HEIGHT
-            bln_hit_wall = True
+        bln_hit_wall = self.rectDbl.left < 0 or \
+                       self.rectDbl.right > const.ARENA_WIDTH or \
+                       self.rectDbl.top <= 0 or \
+                       self.rectDbl.bottom >= const.ARENA_HEIGHT
 
         if bln_hit_wall and not self.bln_allow_wall_sliding:
             self.rectDbl.center = tplCenterPrior
+
+        buffer = .5
+        if self.rectDbl.left < 0:
+            self.rectDbl.left = buffer
+        if self.rectDbl.right > const.ARENA_WIDTH:
+            self.rectDbl.right = const.ARENA_WIDTH - buffer
+        if self.rectDbl.top <= 0:
+            self.rectDbl.top = buffer
+        if self.rectDbl.bottom >= const.ARENA_HEIGHT:
+            self.rectDbl.bottom = const.ARENA_HEIGHT - buffer
 
     def _move_angular(self, dblAngularVel:float,
                       tplCenterRot:Tuple[float,float] = None,
@@ -208,23 +211,25 @@ class Robot(pygame.sprite.Sprite):
             self.rectDbl.centerx = tplCenterRot[0] + const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.cos(dblRadians)
             self.rectDbl.centery = tplCenterRot[1] - const.CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER * math.sin(dblRadians)
 
-        bln_hit_wall = False
-        if self.rectDbl.left < 0:
-            self.rectDbl.left = 0
-            bln_hit_wall = True
-        if self.rectDbl.right > const.ARENA_WIDTH:
-            self.rectDbl.right = const.ARENA_WIDTH
-            bln_hit_wall = True
-        if self.rectDbl.top <= 0:
-            self.rectDbl.top = 0
-            bln_hit_wall = True
-        if self.rectDbl.bottom >= const.ARENA_HEIGHT:
-            self.rectDbl.bottom = const.ARENA_HEIGHT
-            bln_hit_wall = True
+        bln_hit_wall = self.rectDbl.left < 0 or \
+            self.rectDbl.right > const.ARENA_WIDTH or \
+            self.rectDbl.top <= 0 or \
+            self.rectDbl.bottom >= const.ARENA_HEIGHT
 
         if bln_hit_wall and not self.bln_allow_wall_sliding:
             self.rectDbl.center = tplCenterPrior
             self.rectDbl.rotation = dblRotationPrior
+
+        buffer = .5
+        if self.rectDbl.left < 0:
+            self.rectDbl.left = buffer
+        if self.rectDbl.right > const.ARENA_WIDTH:
+            self.rectDbl.right = const.ARENA_WIDTH - buffer
+        if self.rectDbl.top <= 0:
+            self.rectDbl.top = buffer
+        if self.rectDbl.bottom >= const.ARENA_HEIGHT:
+            self.rectDbl.bottom = const.ARENA_HEIGHT - buffer
+
 
 
 

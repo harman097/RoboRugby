@@ -29,12 +29,59 @@ Point = namedtuple('Point', ['x', 'y'])
 def distance(tplA :Tuple[float,float], tplB :Tuple[float,float]) -> float:
     return math.pow((tplB[0] - tplA[0])**2 + (tplB[1] - tplA[1])**2, .5)
 
-# These are defined with ccw rotation = positive, y-axis inverted (aka totally fucked, fix later if you want)
+
+def get_slope_yint(tpl_a: Tuple[float, float], tpl_b: Tuple[float, float]) -> Tuple[float, float]:
+    """
+    Returns slope and y-intercept of the line that intersects both points.
+    :param tpl_a: Point a.
+    :param tpl_b: Point b.
+    :return: Slope and y-intercept of line.
+    """
+    m = Div0(tpl_b[1] - tpl_a[1], tpl_b[0] - tpl_a[0])
+    if m == float("inf"):
+        return m, float("-inf")
+    elif m == float("-inf"):
+        return m, float("inf")
+    else:
+        b = tpl_a[1] - tpl_a[0] * m
+        return m, b
+
+def get_line_intersection(line_1 :List[Tuple[float, float]], line_2 :List[Tuple[float, float]]) -> Tuple[float, float]:
+    if len(line_1) != 2 or len(line_2) != 2:
+        raise Exception("Invalid parameters. Expecting two points per line.")
+    m_1, b_1 = get_slope_yint(line_1[0], line_1[1])
+    m_2, b_2 = get_slope_yint(line_2[0], line_2[1])
+
+    if m_1 == m_2 or (math.isinf(m_1) and math.isinf(m_2)):
+        return Point(x=float("inf"), y=float("inf"))
+
+    if math.isinf(m_1):
+        x_I = line_1[0][0]
+        y_I = m_2*x_I + b_2
+    elif math.isinf(m_2):
+        x_I = line_2[0][0]
+        y_I = m_1*x_I + b_1
+    else:
+        x_I = (b_1 - b_2) / (m_2 - m_1)
+        y_I = m_1 * x_I + b_1
+
+    return Point(x=x_I, y=y_I)
+
 def angle_degrees(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float:
-    return math.degrees(math.tanh(tpl_b[0] - tpl_a[0] / tpl_a[1] - tpl_b[1]))
+    return (math.degrees(angle_radians(tpl_a, tpl_b)) + 720) % 360
 
 def angle_radians(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float:
-    return math.tanh(tpl_b[0] - tpl_a[0] / tpl_a[1] - tpl_b[1])
+    d_y = tpl_b[1] - tpl_a[1]
+    d_x = tpl_b[0] - tpl_a[0]
+    ang = math.atan(Div0(d_y, d_x))
+    # deg = math.degrees(ang)
+    # adjust for quadrant
+    if d_x < 0:
+        ang += math.pi
+    # flip due to our crappy mirrored y-axis
+    return 2 * math.pi - ang
+
+
 
 # pygame rects are just ints, unfortunately, which makes any physics difficult
 class FloatRect:
@@ -154,7 +201,7 @@ class FloatRect:
             )
 
     @property
-    def sides(self) -> List[Point]:
+    def sides(self) -> List[Tuple[Point, Point]]:
         return list(map(self.side, FloatRect.SideType))
 
     def side_as_right_triangle(self, enmSide: 'FloatRect.SideType') -> 'RightTriangle':
