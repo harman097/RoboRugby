@@ -1,19 +1,28 @@
 import robo_rugby.gym_env.RR_ScoreKeepers as sk
 import robo_rugby.gym_env.RR_EnvBase as base
+import robo_rugby.gym_env.RR_Observers as obs
 import gym
 
 """
 Create different possible entry point classes for loading environments with gym.
 """
 
-class SimpleChasePos(sk.ChasePosBall, base.GameEnv_Simple_AngleDistObs):
+
+class SimpleChasePos(sk.ChasePosBall, obs.PosBall_BasicLidar, base.GameEnv_Simple):
     """ Simple (discrete) environment that just tries to get the stupid robots to chase the positive ball."""
 
-class SimpleDuel(sk.PushPosBallsToGoal, sk.PushNegBallsFromGoal, base.GameEnv_Simple):
+
+class SimpleDuel(sk.ChasePosBall, sk.PushPosBallsToGoal, obs.PosBall_BasicLidar, base.GameEnv_Simple):
     """ Simple (discrete) environment that only awards points for pushing balls towards the right goal. """
 
 
-
+class SimpleDuel2(
+    sk.PushPosBallsToGoal,
+    sk.ChasePosBall,
+    sk.NaughtyBots,
+    obs.PosBall_BasicLidar,
+    base.GameEnv_Simple):
+    """ Simple (discrete) environment that only awards points for pushing balls towards the right goal. """
 
 
 def get_tf_wrapped_robo_rugby_env():

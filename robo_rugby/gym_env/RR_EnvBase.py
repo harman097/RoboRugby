@@ -23,12 +23,6 @@ from . import RR_TrashyPhysics as TrashyPhysics
 
 MyUtils.PRINT_STAGE = False  # Disable stage spam
 
-
-# TODO perf stuff (if we end up doing serious training with this)
-# (1) Pre-cache sin/cos results in a dictionary when initializing -or- quaternions? (they're a thing, idk the math tho)
-# Avoid math.sin/cos and radian->degree conversion (cuz it's probly slow?)
-# (2) Can avoid pygame.transform.rotate calls entirely if we're not rendering (I'm assuming it's slow)
-
 class GameEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
@@ -115,18 +109,6 @@ class GameEnv(gym.Env):
         else:
             self._lst_starting_positions = lst_starting_config
             self._set_starting_positions()
-
-        Stage("There shall be scorekeepers! eventually")
-        self.set_scorekeepers = set()  # type: Set[sk.AbstractScoreKeeper]
-
-        # Minitaur gym is a good example of similar inputs/outputs
-        # Velocity/position/rotation can never be > bounds of the arena... barring crazy constants
-        if GameEnv.observation_space is None:  # shared variable from base class, gym.Env()
-            arrState = self.get_game_state()
-            dblObservationHigh = max(const.ARENA_WIDTH, const.ARENA_HEIGHT, 360)
-            dblObservationLow = dblObservationHigh * -1
-            GameEnv.observation_space = gym.spaces.Box(
-                dblObservationLow, dblObservationHigh, dtype=np.float32, shape=arrState.shape)
 
         if GameEnv.action_space is None:  # shared variable from base class, gym.Env()
             # alngActions = np.array([1] * len(self.lstRobots) * 2)
@@ -298,9 +280,9 @@ class GameEnv(gym.Env):
             Stage("Did they smash each other?")
             for sprRobot1, sprRobot2 in TrashyPhysics.collision_pairs_self(
                     self.grpRobots, fncCollided=TrashyPhysics.robots_collided):
-                # Raise the 'on_robot_collision' event
-                for scorekeeper in self.set_scorekeepers:
-                    scorekeeper.on_robot_collision(sprRobot1, sprRobot2)
+
+                self.on_robot_collision(sprRobot1, sprRobot2)
+
                 lngNaughtyLoop = 0
                 while True:
                     lngNaughtyLoop += 1
@@ -410,44 +392,10 @@ class GameEnv(gym.Env):
         # handle scoring by making a child class in RR_ScoreKeepers that overrides this method
         return 0.0
 
-    def get_game_state(self, intTeam=const.TEAM_HAPPY) -> np.ndarray:
-        """
-        Key pieces we're outputting (not necessarily in this order):
-        Center X,Y coords of each robot.
-        Center X,Y coords of each robot, prior step.
-        Rotation of each robot.
-        Rotation of each robot, prior step.
-        Center X,Y coords of each ball.
-        Center X,Y coords of each ball, prior step.
-        :param intTeam: Is this the game state from happy team's perspective? or grumpy's?
-        :return: numpy.ndarray
-        """
-        if intTeam == const.TEAM_HAPPY:  # report happy bots first
-            return np.concatenate((
-                list(map(self._robot_state, self.lstHappyBots)),
-                list(map(self._robot_state, self.lstGrumpyBots)),
-                list(map(self._ball_state, self.lstBalls))
-            ), axis=None)
-        else:  # report grumpy bots first
-            return np.concatenate((
-                list(map(self._robot_state, self.lstGrumpyBots)),
-                list(map(self._robot_state, self.lstHappyBots)),
-                list(map(self._ball_state, self.lstBalls))
-            ), axis=None)
-
-    def _ball_state(self, sprBall: Ball) -> List[float]:
-        return [sprBall.rectDbl.centerx,
-                sprBall.rectDbl.centery,
-                sprBall.rectDblPriorStep.centerx,
-                sprBall.rectDblPriorStep.centery]
-
-    def _robot_state(self, sprRobot: Robot) -> List[float]:
-        return [sprRobot.rectDbl.centerx,
-                sprRobot.rectDbl.centery,
-                sprRobot.rectDbl.rotation,
-                sprRobot.rectDblPriorStep.centerx,
-                sprRobot.rectDblPriorStep.centery,
-                sprRobot.rectDblPriorStep.rotation]
+    def get_game_state(self, intTeam=const.TEAM_HAPPY, obj_robot=None) -> np.ndarray:
+        # DO NOT CHANGE
+        # handle definition of the game state (observations) by making a child class in RR_Observers that overrides this method
+        return None
 
     def game_is_done(self):
         return self.lngStepCount > const.GAME_LENGTH_STEPS or \
@@ -475,6 +423,7 @@ class GameEnv(gym.Env):
 
 
 class GameEnv_Simple(GameEnv):
+    """ Simplified version of GameEnv with a discrete action space. """
 
     class Direction(Enum):
         FORWARD = 0
@@ -498,8 +447,6 @@ class GameEnv_Simple(GameEnv):
     }
 
     def __init__(self, lst_starting_config: List[Tuple[float, float]] = GameEnv.CONFIG_RANDOM):
-        """Simplified version of the standard GameEnv. Only awards points for chasing positive balls."""
-        """ Don't need to override observation_space since _get_game_state() is set correctly. """
         if GameEnv.action_space is None:
             GameEnv.action_space = gym.spaces.Discrete(len(GameEnv_Simple.Direction))
             # todo truly this is "multi-discrete" and not single discrete, so swap this at some point
@@ -507,15 +454,6 @@ class GameEnv_Simple(GameEnv):
             #     [len(RoboRogby_Discrete.Direction)]*const.NUM_ROBOTS_TOTAL)
 
         super(GameEnv_Simple, self).__init__(lst_starting_config)
-
-        # for sprRobot in self.lstRobots:
-        #     sprRobot.bln_allow_wall_sliding = True
-
-    # def reset(self, bln_randomize_pos :bool = True) -> np.ndarray:
-    #     obs = super(GameEnv_Simple, self).reset(bln_randomize_pos)
-    #     # for sprRobot in self.lstRobots:
-    #     #     sprRobot.bln_allow_wall_sliding = True
-    #     return obs
 
     def step(self, lstArgs: List[Direction]):
         # flatten args into 1-D array, if they're not already (tf passes like this)
@@ -527,103 +465,3 @@ class GameEnv_Simple(GameEnv):
             lst_args_super.append(GameEnv_Simple._dct_thrust_from_direction[arr_args[i]])
 
         return super(GameEnv_Simple, self).step(lst_args_super)
-
-    """ Simplify the observation space. No 'prior position' elements. """
-    def _ball_state(self, sprBall: Ball) -> List[float]:
-        return [float(sprBall.rectDbl.centerx),
-                float(sprBall.rectDbl.centery)]
-
-    def _robot_state(self, sprRobot: Robot) -> List[float]:
-        return [float(sprRobot.rectDbl.centerx),
-                float(sprRobot.rectDbl.centery),
-                float(sprRobot.rectDbl.rotation)]
-
-class GameEnv_Simple_AngleDistObs(GameEnv_Simple):
-
-    def __init__(self, lst_starting_config: List[Tuple[float, float]] = GameEnv.CONFIG_RANDOM):
-        if const.NUM_ROBOTS_HAPPY != 1 or const.NUM_ROBOTS_GRUMPY != 1:
-            print("Warning: Observation space/action space is robot-specific (assumes 1 robot per team).")
-        super(GameEnv_Simple_AngleDistObs, self).__init__(lst_starting_config)
-
-    def get_game_state(self, intTeam=const.TEAM_HAPPY) -> np.ndarray:
-        """
-        Move to a more... bayesian-friendly?... observation space (Skyler's original proposed observation-space, iirc).
-
-        For a given robot:
-        Bot's current rotation.
-        Rotation to positive ball.
-        Distance to positive ball.
-        Front/back lidar (distance to wall straight out front/straight out back)
-
-        #todo expand this later, if success
-        :param intTeam:
-        :return:
-        """
-        if intTeam == const.TEAM_HAPPY:
-            return np.asarray(self._robot_state(self.lstHappyBots[0]))
-        else:
-            return np.asarray(self._robot_state(self.lstGrumpyBots[0]))
-
-    def _robot_state(self, sprRobot: Robot) -> List[float]:
-        b = self.lstPosBalls[0]  # type: Ball
-        ball_angle = (angle_degrees(sprRobot.rectDbl.center, b.rectDbl.center) + 360) % 360
-        ball_dist = abs(distance(sprRobot.rectDbl.center, b.rectDbl.center))
-
-        """ Calc super primitive lidar extending front/back from center of bot """
-        top_a, top_b = sprRobot.rectDbl.side(FloatRect.SideType.TOP)
-        bottom_a, bottom_b = sprRobot.rectDbl.side(FloatRect.SideType.BOTTOM)
-        mid_top = Point(x = (top_a.x + top_b.x) / 2, y = (top_a.y + top_b.y) / 2)
-        mid_bot = Point(x = (bottom_a.x + bottom_b.x) / 2, y = (bottom_a.y + bottom_b.y) / 2)
-
-        lst_surfaces = [
-            [(0,0), (const.ARENA_WIDTH, 0)],
-            [(const.ARENA_WIDTH, 0), (const.ARENA_WIDTH, const.ARENA_HEIGHT)],
-            [(const.ARENA_WIDTH, const.ARENA_HEIGHT), (0, const.ARENA_HEIGHT)],
-            [(0, const.ARENA_HEIGHT), (0,0)]
-        ]
-
-        for other_bot in self.lstRobots:
-            if not other_bot is sprRobot:
-                for a,b in other_bot.rectDbl.sides:
-                    lst_surfaces.append([a,b])
-
-        lst_front = []
-        lst_back = []
-        for side in lst_surfaces:
-            x_i, y_i = get_line_intersection(side, [mid_top, mid_bot])
-            if x_i is None or y_i is None:
-                pass  # doesn't intersect
-
-            elif mid_bot.x < mid_top.x < x_i or \
-                    x_i < mid_top.x < mid_bot.x or \
-                    mid_bot.y < mid_top.y < y_i or \
-                    y_i < mid_top.y < mid_bot.y:
-                """ Viewing this out of the front of the bot """
-                lst_front.append(distance(mid_top, (x_i, y_i)))
-
-            elif mid_top.x < mid_bot.x < x_i or \
-                    x_i < mid_bot.x < mid_top.x or \
-                    mid_top.y < mid_bot.y < y_i or \
-                    y_i < mid_bot.y < mid_top.y:
-                """ Viewing this out of the back of the bot """
-                lst_back.append(distance(mid_bot, (x_i, y_i)))
-
-            elif mid_top.x <= x_i <= mid_bot.x or \
-                    mid_bot.x <= x_i <= mid_top.x or \
-                    mid_top.y <= y_i <= mid_bot.y or \
-                    mid_bot.y <= y_i <= mid_top.y:
-                lst_front.append(0)
-                lst_back.append(0)
-            else:
-                raise Exception("This 'am i looking out front or back?' check is dum.")
-
-        lidar_front = min(lst_front)
-        lidar_back = min(lst_back)
-
-        return [
-            float(sprRobot.dblRotation),
-            float(ball_angle),
-            float(ball_dist),
-            float(lidar_front),
-            float(lidar_back)
-        ]
