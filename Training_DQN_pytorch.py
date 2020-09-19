@@ -229,6 +229,8 @@ def get_action_from_player() -> int:
 
 
 if __name__ == "__main__":
+    if const.GAME_MODE:
+        raise Exception("Game mode settings are enabled in RR_Constants.")
     # str_env = "LunarLander-v2"
     # str_env = "RoboRugbySimple-v0"
     str_env = "RoboRugbySimpleDuel-v2"
@@ -262,7 +264,7 @@ if __name__ == "__main__":
     n_games = 10000
     n_games_human = 0
     bln_render = True
-    checkpoint_freq = 100  # save/record every X games
+    checkpoint_freq = 250  # save/record every X games
 
     """
     SHOULD WE LOAD A CHECKPOINT OR NOT? (CAREFUL WITH THIS)
@@ -359,7 +361,7 @@ if __name__ == "__main__":
 
         if bln_checkpoint:
             # agent.save_checkpoint(dct_checkpoints[i] + ".dat")
-            with open(dct_checkpoints[i] + ".pickle") as f:
+            with open(dct_checkpoints[i] + ".pickle", "wb") as f:
                 pickle.dump(agent, file=f)
             video_stream.close()
 
