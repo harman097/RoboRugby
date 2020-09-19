@@ -14,7 +14,7 @@ to a Decorator design pattern* for calculating score.
 "decorated instance", but with Python super() calls the end
 result is basically the same and the normal way might not work
 with how gym.make_env() instantiates (just gets passed a type
-to instantiate so... might not be an opportunity to "decorate".
+to instantiate so... might not be an opportunity to "decorate").
 """
 class AbstractScoreKeeper(GameEnv):
     def __init__(self, lst_starting_config:List[Tuple[float, float]] = GameEnv.CONFIG_RANDOM):

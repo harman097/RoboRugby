@@ -13,14 +13,18 @@ import os
 import pygame
 import copy
 import matplotlib.pyplot as plt
+import pickle
+
 # import gym.envs.box2d.lunar_lander
 
 """ Only using Linear layers instead of convolutional because the observation array is so basic (len 8 array) """
+
 
 # region DeepQNetwork + Agent
 
 class DeepQNetwork(nn.Module):
     """ Inheriting from nn.Module gives us stuff like backpropagation """
+
     def __init__(self, lr, input_dims, fc1_dims, fc2_dims, n_actions):
         """
 
@@ -66,7 +70,7 @@ class DeepQNetwork(nn.Module):
 
 class DQNAgent():
     def __init__(self, gamma, epsilon, lr, input_dims, batch_size, n_actions,
-                 max_mem_size = 100000, eps_end=0.01, eps_dec=5e-4,
+                 max_mem_size=100000, eps_end=0.01, eps_dec=5e-4,
                  fc1_dims=256, fc2_dims=256,
                  target_update_freq=50000):
         #          gamma_inc=.1,
@@ -131,8 +135,9 @@ class DQNAgent():
         self.reward_memory[i] = reward
         self.mem_cntr += 1
 
-    def choose_action(self, observation, bln_from_policy = False):
-        if bln_from_policy or np.random.random() > self.epsilon:
+    def choose_action(self, observation, epsilon_override=None):
+        epsilon = epsilon_override if epsilon_override else self.epsilon
+        if np.random.random() > epsilon:
             """ stick to policy """
             state = T.tensor([observation]).to(self.Q_eval.device)
             actions = self.Q_eval(state)
@@ -190,6 +195,7 @@ class DQNAgent():
     def load_checkpoint(self, str_file):
         self.Q_eval.load_checkpoint(str_file)
 
+
 # endregion
 
 def get_action_from_player() -> int:
@@ -221,9 +227,11 @@ def get_action_from_player() -> int:
     else:
         return np.random.choice(list(i for i in range(len(GameEnv_Simple.Direction))))
 
+
 if __name__ == "__main__":
     # str_env = "LunarLander-v2"
-    str_env = "RoboRugbySimple-v0"
+    # str_env = "RoboRugbySimple-v0"
+    str_env = "RoboRugbySimpleDuel-v2"
     env = gym.make(str_env)
     """
     2020_09_13__00_56 - lr .0001, gamma .95, eps_dec 1e-6, fc1/fc2 256, no human start - 1000+, NEVER CONVERGED
@@ -236,24 +244,35 @@ if __name__ == "__main__":
         Avg score 1800 @ ~450 games, epsilon .08
     """
     agent = DQNAgent(
-        gamma=.99,  #0.99,
+        gamma=.99,  # 0.99,
         # gamma_inc=1e-4,
         # gamma_end=.99,
         epsilon=1.0,
-        lr=.0005, #0.001,
+        lr=.0005,  # 0.001,
         input_dims=env.observation_space.shape,
         batch_size=env.spec.max_episode_steps * 10 + 100,
         n_actions=len(GameEnv_Simple.Direction),
-        eps_end=0.05,
-        eps_dec=.99998,
+        eps_end=0.2,
+        eps_dec=.999998,
         fc1_dims=256,
         fc2_dims=256
     )
 
     scores, scores_grumpy, eps_history = [], [], []
-    n_games = 1000
+    n_games = 10000
     n_games_human = 0
     bln_render = True
+    checkpoint_freq = 100  # save/record every X games
+
+    """
+    SHOULD WE LOAD A CHECKPOINT OR NOT? (CAREFUL WITH THIS)
+    """
+
+    lng_start_episode = 0
+    str_session = ""
+
+    assert (lng_start_episode == 0 and str_session == "") or \
+           (lng_start_episode != 0 and str_session != "")
 
     if not os.path.exists('plots'):
         os.makedirs('plots')
@@ -262,25 +281,18 @@ if __name__ == "__main__":
     if not os.path.exists('checkpoints/dqn'):
         os.makedirs('checkpoints/dqn')
 
-    """
-    SHOULD WE LOAD A CHECKPOINT OR NOT? (CAREFUL WITH THIS)
-    """
-
-    lng_start_episode = 0
-    str_session = ""
-    assert (lng_start_episode == 0 and str_session == "") or \
-           (lng_start_episode != 0 and str_session != "")
-    
     if str_session == "":
         dtm_start = datetime.datetime.now()
         dir = f"DQN_Pytorch_{str_env}_{dtm_start.strftime('%Y_%m_%d__%H_%M')}"
-        os.makedirs(f"checkpoints/dqn/{dir}")        
+        os.makedirs(f"checkpoints/dqn/{dir}")
     else:
         dir = f"DQN_Pytorch_{str_env}_{str_session}"
-        agent.load_checkpoint(f"checkpoints/dqn/{dir}/{dir}_Ep_{lng_start_episode}.dat")
+        with open(f"checkpoints/dqn/{dir}/{dir}_Ep_{lng_start_episode}.pickle", "rb") as f:
+            agent = pickle.load(file=f)
+
+        # agent.load_checkpoint(f"checkpoints/dqn/{dir}/{dir}_Ep_{lng_start_episode}.dat")
         print(f"Resuming from Episode {lng_start_episode}, Session {str_session}, Env {str_env}")
 
-    checkpoint_freq = 100  # save/record every X games
     dct_checkpoints = dict.fromkeys(i for i in range(lng_start_episode + checkpoint_freq, n_games, checkpoint_freq))
     if not n_games - 1 in dct_checkpoints:  # make sure the final run is a checkpoint
         dct_checkpoints[n_games - 1] = ""
@@ -289,7 +301,7 @@ if __name__ == "__main__":
 
     clock = pygame.time.Clock()
 
-    for i in range(lng_start_episode + 1, n_games, 1):
+    for i in range(lng_start_episode, n_games, 1):
         score = 0
         score_grumpy = 0
         done = False
@@ -306,13 +318,14 @@ if __name__ == "__main__":
             if bln_player and not bln_checkpoint:
                 action = get_action_from_player()
             else:
-                action = agent.choose_action(observation, bln_from_policy=bln_checkpoint)
+                action = agent.choose_action(observation, epsilon_override=.08 if bln_checkpoint else None)
 
-            action_grumpy = agent.choose_action(obs_grumpy, bln_from_policy=bln_checkpoint)
+            if const.NUM_ROBOTS_GRUMPY > 0:
+                action_grumpy = agent.choose_action(obs_grumpy, epsilon_override=.08 if bln_checkpoint else None)
 
-            info :robo_rugby.gym_env.GameEnv.DebugInfo
+            info: robo_rugby.gym_env.GameEnv.DebugInfo
 
-            observation_, reward, done, info = env.step([action, action_grumpy])
+            observation_, reward, done, info = env.step([action])  # , action_grumpy])
             obs_grumpy_ = info.adblGrumpyState
             reward_grumpy = info.dblGrumpyScore
 
@@ -321,7 +334,8 @@ if __name__ == "__main__":
 
             if not bln_checkpoint:
                 agent.store_transition(observation, action, reward, observation_, done)
-                agent.store_transition(obs_grumpy, action_grumpy, reward_grumpy, obs_grumpy_, done)
+                if const.NUM_ROBOTS_GRUMPY > 0:
+                    agent.store_transition(obs_grumpy, action_grumpy, reward_grumpy, obs_grumpy_, done)
                 agent.learn()
 
             observation = observation_
@@ -344,10 +358,12 @@ if __name__ == "__main__":
               "score %d" % score, "avg grump %d" % avg_score_grumpy, "score grump %d" % score_grumpy)
 
         if bln_checkpoint:
-            agent.save_checkpoint(dct_checkpoints[i] + ".dat")
+            # agent.save_checkpoint(dct_checkpoints[i] + ".dat")
+            with open(dct_checkpoints[i] + ".pickle") as f:
+                pickle.dump(agent, file=f)
             video_stream.close()
 
-    x = [i+1 for i in range(n_games)]
+    x = [i + 1 for i in range(n_games)]
     filename = f"plots/{dir}.png"
     running_avg = np.zeros(len(scores))
     ra_grump = np.zeros(len(scores_grumpy))
@@ -358,9 +374,3 @@ if __name__ == "__main__":
     plt.plot(x, ra_grump)
     plt.title('Running average of previous 100 scores')
     plt.savefig(filename)
-
-
-
-
-
-

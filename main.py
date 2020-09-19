@@ -85,7 +85,7 @@ while blnRunGame:
             # (random.randint(-1,1), random.randint(-1,1))
             lstInput.append(action)
 
-        observation, reward, done, info  = env.step(lstInput)
+        observation, reward, done, info = env.step(lstInput)
         total_reward += reward
 
         if done:
