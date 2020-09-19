@@ -6,7 +6,7 @@ import gym
 Create different possible entry point classes for loading environments with gym.
 """
 
-class SimpleChasePos(sk.ChasePosBall, base.GameEnv_Simple):
+class SimpleChasePos(sk.ChasePosBall, base.GameEnv_Simple_AngleDistObs):
     """ Simple (discrete) environment that just tries to get the stupid robots to chase the positive ball."""
 
 class SimpleDuel(sk.PushPosBallsToGoal, sk.PushNegBallsFromGoal, base.GameEnv_Simple):
