@@ -177,3 +177,11 @@ class PushNegBallsFromGoal(AbstractScoreKeeper):
     def _calc_ball_dist_sum(self):
         # Grumpy's goal is in the 0,0 corner, therefore higher distance is better for Grumpy team
         return sum(map(lambda x: distance((0, 0), x.rectDbl.center), self.lstPosBalls))
+
+class PushPosBallsInYourGoal(AbstractScoreKeeper):
+    """ TODO THIS """
+
+class PushNegBallsInTheirGoal(AbstractScoreKeeper):
+    """ TODO THIS ALSO """
+
+

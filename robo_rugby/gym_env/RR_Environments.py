@@ -24,6 +24,18 @@ class SimpleDuel2(
     base.GameEnv_Simple):
     """ Simple (discrete) environment that only awards points for pushing balls towards the right goal. """
 
+class SimpleDuel3(
+    sk.PushPosBallsToGoal,
+    sk.ChasePosBall,
+    sk.NaughtyBots,
+    obs.SingleBall_6wayLidar_v2,
+    base.GameEnv_Simple):
+    """
+    Simple (discrete) environment that only awards points for pushing balls towards the right goal.
+
+    More complete observation space than SimpleDuel2.
+    """
+
 
 def get_tf_wrapped_robo_rugby_env():
     """Wraps given gym environment with TF Agent's GymWrapper.

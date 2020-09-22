@@ -46,7 +46,9 @@ def get_slope_yint(tpl_a: Tuple[float, float], tpl_b: Tuple[float, float]) -> Tu
         b = tpl_a[1] - tpl_a[0] * m
         return m, b
 
-def get_line_intersection(line_1 :List[Tuple[float, float]], line_2 :List[Tuple[float, float]]) -> Tuple[float, float]:
+def get_line_intersection(line_1 :Tuple[Tuple[float, float],Tuple[float, float]],
+                          line_2 :Tuple[Tuple[float, float],Tuple[float, float]]) -> Tuple[float, float]:
+
     if len(line_1) != 2 or len(line_2) != 2:
         raise Exception("Invalid parameters. Expecting two points per line.")
     m_1, b_1 = get_slope_yint(line_1[0], line_1[1])

@@ -18,6 +18,14 @@ class Ball(pygame.sprite.Sprite):
     def radius(self) -> float:  # used by pygame to check circle collisions
         return const.BALL_RADIUS
 
+    @property
+    def is_positive(self):
+        return self.tplColor == const.COLOR_BALL_POS
+
+    @property
+    def is_negative(self):
+        return self.tplColor == const.COLOR_BALL_NEG
+
     def __init__(self, tplColor:Tuple[int,int,int], tplCenter:Tuple[float,float]):
         super(Ball, self).__init__()
         self.dblXVelocity = 0

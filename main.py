@@ -5,7 +5,17 @@ import pygame
 import random
 import imageio
 import robo_rugby
+
+""" Needed in order to de-pickle the model saved from Training_DQN_pytorch (pickle quirk)"""
+import pickle
+import Training_DQN_pytorch
+from Training_DQN_pytorch import DQNAgent, DeepQNetwork
+
 from robo_rugby.gym_env.RR_EnvBase import GameEnv
+import robo_rugby.gym_env.RR_Observers as RR_Observers
+import robo_rugby.gym_env.RR_ScoreKeepers as RR_Scorekeepers
+from robo_rugby.gym_env.RR_Players import Human, OG_Twitchy
+from DQN_pytorch_player import Stephen
 import robo_rugby.gym_env.RR_Constants as const
 
 # Each frame of the game is driven by step()
@@ -13,15 +23,10 @@ import robo_rugby.gym_env.RR_Constants as const
 # So we need to design our game in a way that it can handle
 # keyboard input vs machine input to the step() function.
 
-blnPLAYER = True  # person is playing
-blnRENDER = True  # should we slow it down and render?
-blnRECORD = True
+blnRECORD = False
 strVideoFile = "SeeHowAwesomeYouDid.mp4"
-if blnPLAYER:
-    blnRENDER = True
 
-if blnRENDER:
-    objClock = pygame.time.Clock()
+objClock = pygame.time.Clock()
 
 objVideoWriter = None
 if blnRECORD:
@@ -31,96 +36,75 @@ Stage("Start the game!")
 if not const.GAME_MODE:
     """ If anyone has a better way of managing this, I'm all ears. Doing this for now since it's easiest. """
     print("WARNING: RoboRugby constants aren't set for game mode. Turn on the GAME_MODE flag in RR_Constants.")
-env = GameEnv()
+# env = GameEnv()
+
+""" Create a custom instance with the components we want """
+class JustPlayTheFreakingGame(
+    RR_Scorekeepers.PushPosBallsInYourGoal,
+    RR_Scorekeepers.PushNegBallsInTheirGoal,
+    RR_Scorekeepers.BaseDestruction,
+    RR_Observers.SingleBall_6wayLidar,  # so Stephen can play
+    GameEnv  # not stricly necessary, since all these other inherit from it, as well
+):
+    pass
+
+env = JustPlayTheFreakingGame()
 blnRunGame = True
 total_reward = 0
+
+"""
+INTRODUCE THE PLAYERS!!!!
+"""
+lstPlayers = [
+    Stephen(env, env.lstHappyBots[0]),
+    Stephen(env, env.lstHappyBots[1]),
+    Human(env, env.lstGrumpyBots[0], key_left=pygame.K_a, key_right=pygame.K_d,
+          key_forwards=pygame.K_w, key_backwards=pygame.K_s),
+    OG_Twitchy(env, env.lstGrumpyBots[1])
+]
+
 while blnRunGame:
 
-    if blnPLAYER:
-        # Check for when player is quitting
-        for objEvent in pygame.event.get():
-            if objEvent.type == pygame.QUIT:
-                blnRunGame = False
-                break
-            elif objEvent.type == pygame.KEYDOWN and objEvent.key == pygame.K_ESCAPE:
-                blnRunGame = False
-                break
+    # Check for when player is quitting
+    for objEvent in pygame.event.get():
+        if objEvent.type == pygame.QUIT:
+            blnRunGame = False
+            break
+        elif objEvent.type == pygame.KEYDOWN and objEvent.key == pygame.K_ESCAPE:
+            blnRunGame = False
+            break
 
-        # Process player input to send to the step function
-        dctKeyDown = pygame.key.get_pressed()
-        lngLThrust = 0
-        lngRThrust = 0
-        if dctKeyDown[const.KEY_LEFT_MOTOR_FORWARD]: lngLThrust += 1
-        if dctKeyDown[const.KEY_LEFT_MOTOR_BACKWARD]: lngLThrust -= 1
-        if dctKeyDown[const.KEY_RIGHT_MOTOR_FORWARD]: lngRThrust += 1
-        if dctKeyDown[const.KEY_RIGHT_MOTOR_BACKWARD]: lngRThrust -= 1
-        if dctKeyDown[const.KEY_BOTH_MOTOR_FORWARD]:
-            lngLThrust += 1
-            lngRThrust += 1
-        if dctKeyDown[const.KEY_BOTH_MOTOR_BACKWARD]:
-            lngLThrust -= 1
-            lngRThrust -= 1
-        if dctKeyDown[const.KEY_BOTH_MOTOR_LEFT]:
-            lngLThrust -= 1
-            lngRThrust += 1
-        if dctKeyDown[const.KEY_BOTH_MOTOR_RIGHT]:
-            lngLThrust += 1
-            lngRThrust -= 1
+    lstActions = list(map(lambda x: x.get_action(), lstPlayers))
 
-        lstInput = [(lngLThrust, lngRThrust)]
-        for _ in range(1, const.NUM_ROBOTS_HAPPY + const.NUM_ROBOTS_GRUMPY):
-            rando = random.random()
-            action = (0,0)
-            # ~5% chance to turn left or right, 45% chance to go forward/back
-            if rando <= 0.05:
-                # turn left
-                action = (-1,1)
-            elif rando <= 0.5:
-                # go straight
-                action = (1,1)
-            elif rando < 0.95:
-                # go back
-                action = (-1,-1)
-            else:
-                # turn right
-                action = (1,-1)
+    observation, reward, done, info = env.step(lstActions)
+    total_reward += reward
 
-            # (random.randint(-1,1), random.randint(-1,1))
-            lstInput.append(action)
-
-        observation, reward, done, info = env.step(lstInput)
-        total_reward += reward
-
-        if done:
-            # blnRunGame = False
-
-            lngScoreHappy = env.sprHappyGoal.get_score()
-            lngScoreGrumpy = env.sprGrumpyGoal.get_score()
-            print("\nFinal Score")
-            print("Happy Bot %1d  |  Grumpy Bot %1d" % (lngScoreHappy, lngScoreGrumpy))
-            if lngScoreHappy > lngScoreGrumpy:
-                print("Team Happy Bot WINS!!!")
-            elif lngScoreHappy == lngScoreGrumpy:
-                print("Tie!")
-            else:
-                print("Team Grump Bot WINS!!!  ~~boo~~")
-
-            print(f"Reward: {total_reward}")
-
-            print("------ RESETTING --------")
-            total_reward = 0
-            env.reset(False)
-
+    if blnRECORD:
+        objVideoWriter.append_data(env.render(mode='rgb_array'))
     else:
-        raise NotImplementedError("Training section not done.")
+        env.render(mode='human')
 
-    if blnRENDER:
-        if blnRECORD:
-            objVideoWriter.append_data(env.render(mode='rgb_array'))
+    # Ensure we maintain a framerate of ... whatever the framerate is (when rendering)
+    objClock.tick(const.FRAMERATE)
+
+    if done:
+        # blnRunGame = False  NOPE, PLAY MOAR!
+        lngScoreHappy = env.sprHappyGoal.get_score()
+        lngScoreGrumpy = env.sprGrumpyGoal.get_score()
+        print("\nFinal Score")
+        print("Happy Bot %1d  |  Grumpy Bot %1d" % (lngScoreHappy, lngScoreGrumpy))
+        if lngScoreHappy > lngScoreGrumpy:
+            print("Team Happy Bot WINS!!!")
+        elif lngScoreHappy == lngScoreGrumpy:
+            print("Tie!")
         else:
-            env.render(mode='human')
-        # Ensure we maintain a framerate of 120 fps
-        objClock.tick(const.FRAMERATE)
+            print("Team Grump Bot WINS!!!  ~~boo~~")
+
+        print(f"Reward: {total_reward}")
+
+        print("------ RESETTING --------")
+        total_reward = 0
+        env.reset(False)
 
 if objVideoWriter is not None:
     objVideoWriter.close()

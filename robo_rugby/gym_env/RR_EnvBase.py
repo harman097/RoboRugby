@@ -70,6 +70,7 @@ class GameEnv(gym.Env):
         Stage("Initializing RoboRugby...")
         self.grpAllSprites = pygame.sprite.Group()
         self.lngStepCount = 0
+        self.rect_walls = FloatRect(0, const.ARENA_WIDTH, 0, const.ARENA_HEIGHT)
 
         Stage("Here are the goals")
         self.sprHappyGoal = Goal(const.TEAM_HAPPY)
@@ -366,11 +367,11 @@ class GameEnv(gym.Env):
 
         self.on_step_end()
 
-        return self.get_game_state(intTeam=const.TEAM_HAPPY), \
+        return self.get_game_state(), \
                self.get_reward(int_team=const.TEAM_HAPPY), \
                self.game_is_done(), \
                GameEnv.DebugInfo(
-                   self.get_game_state(intTeam=const.TEAM_GRUMPY),
+                   self.get_game_state(int_team=const.TEAM_GRUMPY),
                    self.get_reward(int_team=const.TEAM_GRUMPY)
                )
 
@@ -392,7 +393,7 @@ class GameEnv(gym.Env):
         # handle scoring by making a child class in RR_ScoreKeepers that overrides this method
         return 0.0
 
-    def get_game_state(self, intTeam=const.TEAM_HAPPY, obj_robot=None) -> np.ndarray:
+    def get_game_state(self, int_team: int = None, obj_robot: Robot = None, obj_ball: Ball = None) -> np.ndarray:
         # DO NOT CHANGE
         # handle definition of the game state (observations) by making a child class in RR_Observers that overrides this method
         return None
@@ -446,6 +447,10 @@ class GameEnv_Simple(GameEnv):
         Direction.B_R.value: (0, -1)
     }
 
+    @staticmethod
+    def thrust_from_direction(direction: int) -> Tuple[float, float]:
+        return GameEnv_Simple._dct_thrust_from_direction[direction]
+
     def __init__(self, lst_starting_config: List[Tuple[float, float]] = GameEnv.CONFIG_RANDOM):
         if GameEnv.action_space is None:
             GameEnv.action_space = gym.spaces.Discrete(len(GameEnv_Simple.Direction))
@@ -462,6 +467,6 @@ class GameEnv_Simple(GameEnv):
         if len(arr_args) > const.NUM_ROBOTS_TOTAL:
             raise Exception(f"{len(arr_args)} commands but only {const.NUM_ROBOTS_TOTAL} robots.")
         for i in range(len(arr_args)):
-            lst_args_super.append(GameEnv_Simple._dct_thrust_from_direction[arr_args[i]])
+            lst_args_super.append(GameEnv_Simple.thrust_from_direction(arr_args[i]))
 
         return super(GameEnv_Simple, self).step(lst_args_super)
