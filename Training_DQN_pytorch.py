@@ -233,7 +233,8 @@ if __name__ == "__main__":
         raise Exception("Game mode settings are enabled in RR_Constants.")
     # str_env = "LunarLander-v2"
     # str_env = "RoboRugbySimple-v0"
-    str_env = "RoboRugbySimpleDuel-v2"
+    # str_env = "RoboRugbySimpleDuel-v2"
+    str_env = "RoboRugbySimpleDuel-v3"
     env = gym.make(str_env)
     """
     2020_09_13__00_56 - lr .0001, gamma .95, eps_dec 1e-6, fc1/fc2 256, no human start - 1000+, NEVER CONVERGED
@@ -252,7 +253,7 @@ if __name__ == "__main__":
         epsilon=1.0,
         lr=.0005,  # 0.001,
         input_dims=env.observation_space.shape,
-        batch_size=env.spec.max_episode_steps * 10 + 100,
+        batch_size=env.spec.max_episode_steps * 20 + 100,
         n_actions=len(GameEnv_Simple.Direction),
         eps_end=0.2,
         eps_dec=.999998,
@@ -270,8 +271,11 @@ if __name__ == "__main__":
     SHOULD WE LOAD A CHECKPOINT OR NOT? (CAREFUL WITH THIS)
     """
 
-    lng_start_episode = 0
-    str_session = ""
+    lng_start_episode = 500  # 6000
+    str_session = "2020_09_21__22_07"  # "2020_09_21__09_36"
+    lr_override = 0.0  # .00001
+    epsilon_override = .9
+    eps_dec_override = .9999995
 
     assert (lng_start_episode == 0 and str_session == "") or \
            (lng_start_episode != 0 and str_session != "")
@@ -290,7 +294,13 @@ if __name__ == "__main__":
     else:
         dir = f"DQN_Pytorch_{str_env}_{str_session}"
         with open(f"checkpoints/dqn/{dir}/{dir}_Ep_{lng_start_episode}.pickle", "rb") as f:
-            agent = pickle.load(file=f)
+            agent = pickle.load(file=f)  # type: DQNAgent
+            if lr_override > 0:
+                agent.Q_eval.optimizer = optim.Adam(agent.Q_eval.parameters(), lr=lr_override)
+            if epsilon_override > 0:
+                agent.epsilon = epsilon_override
+            if eps_dec_override > 0:
+                agent.eps_dec = eps_dec_override
 
         # agent.load_checkpoint(f"checkpoints/dqn/{dir}/{dir}_Ep_{lng_start_episode}.dat")
         print(f"Resuming from Episode {lng_start_episode}, Session {str_session}, Env {str_env}")
@@ -308,7 +318,7 @@ if __name__ == "__main__":
         score_grumpy = 0
         done = False
         observation = env.reset()
-        obs_grumpy = env.unwrapped.get_game_state(intTeam=const.TEAM_GRUMPY)
+        obs_grumpy = env.unwrapped.get_game_state(int_team=const.TEAM_GRUMPY)
         bln_checkpoint = (i in dct_checkpoints)
         bln_player = i < n_games_human
 
@@ -320,10 +330,10 @@ if __name__ == "__main__":
             if bln_player and not bln_checkpoint:
                 action = get_action_from_player()
             else:
-                action = agent.choose_action(observation, epsilon_override=.08 if bln_checkpoint else None)
+                action = agent.choose_action(observation, epsilon_override=.1 if bln_checkpoint else None)
 
             if const.NUM_ROBOTS_GRUMPY > 0:
-                action_grumpy = agent.choose_action(obs_grumpy, epsilon_override=.08 if bln_checkpoint else None)
+                action_grumpy = agent.choose_action(obs_grumpy, epsilon_override=.1 if bln_checkpoint else None)
 
             info: robo_rugby.gym_env.GameEnv.DebugInfo
 

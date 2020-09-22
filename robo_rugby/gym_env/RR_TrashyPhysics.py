@@ -2,7 +2,7 @@ import pygame
 from pygame.sprite import Sprite
 from typing import List, Tuple
 from . import RR_Constants as const
-from MyUtils import FloatRect, Point, Div0
+from MyUtils import FloatRect, Point, Div0, distance, get_line_intersection
 import math
 
 def robot_in_goal(sprRobot: 'Robot', sprGoal: 'Goal') -> bool:
@@ -238,4 +238,32 @@ def collision_pairs(grpSprites1: pygame.sprite.Group,
             if fncCollided(lstSpr1[i], lstSpr2[j]):
                 lstPairs.append((lstSpr1[i], lstSpr2[j]))
     return lstPairs
+
+def two_way_lidar_rect(tpl1 :Tuple[float,float],
+                       tpl2 :Tuple[float,float],
+                       lst_rect :List[FloatRect]) -> Tuple[float,float]:
+    """
+    Returns the distance to the nearest object (FloatRect) along the line formed by the two points. This is "two way" so
+    two values are returned for both "forwards" (1->2) and "backwards" (2->1).
+    """
+    start = Point(*tpl1)
+    end = Point(*tpl2)
+
+    lst_front = [float("inf")]
+    lst_back = [float("inf")]
+    for rect in lst_rect:
+        for side in rect.sides:
+            intersection = Point(*get_line_intersection(side, (start, end)))
+            if intersection.x is None or intersection.y is None:
+                pass  # doesn't intersect
+
+            else:
+                dist_endpoint = distance(intersection, end)
+                dist_startpoint = distance(intersection, start)
+                if dist_endpoint <= dist_startpoint:
+                    lst_front.append(dist_endpoint)
+                if dist_startpoint <= dist_endpoint:
+                    lst_back.append(dist_startpoint)
+
+    return min(lst_front), min(lst_back)
 

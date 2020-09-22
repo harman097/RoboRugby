@@ -11,8 +11,10 @@ import gym
 """ 
 Decorator design pattern for observation systems (for easily swapping in/out)
 """
+
+
 class AbstractObservers(GameEnv):
-    def __init__(self, lst_starting_config:List[Tuple[float, float]] = GameEnv.CONFIG_RANDOM):
+    def __init__(self, lst_starting_config: List[Tuple[float, float]] = GameEnv.CONFIG_RANDOM):
         super(AbstractObservers, self).__init__(lst_starting_config)
 
         # Observers overwrite each other, so only one is expected. Bom otherwise.
@@ -34,9 +36,10 @@ class AbstractObservers(GameEnv):
             AbstractObservers.observation_space = gym.spaces.Box(
                 dblObservationLow, dblObservationHigh, dtype=np.float32, shape=arrState.shape)
 
-    def get_game_state(self, intTeam=const.TEAM_HAPPY, obj_robot=None) -> np.ndarray:
+    def get_game_state(self, int_team: int = None, obj_robot: Robot = None, obj_ball: Ball = None) -> np.ndarray:
         """ Override in inherited class. """
-        return super(AbstractObservers, self).get_game_state(intTeam=intTeam)
+        return super(AbstractObservers, self).get_game_state(
+            int_team=int_team, obj_robot=obj_robot, obj_ball=obj_ball)
 
 
 # region XYCoord spaces (did not do well with basic "Push ball" in random loc training)
@@ -44,7 +47,7 @@ class AbstractObservers(GameEnv):
 class AllCoords(AbstractObservers):
     """ Location of all elements reported as coords, including robot rotations. """
 
-    def get_game_state(self, intTeam=const.TEAM_HAPPY, obj_robot=None) -> np.ndarray:
+    def get_game_state(self, int_team: int = None, obj_robot: Robot = None, obj_ball: Ball = None) -> np.ndarray:
         """ todo
         As defined currently, you would need two separate neural nets for Grumpy vs Happy because
         we're not reporting the team or position of the goals and letting the NN infer that
@@ -52,8 +55,12 @@ class AllCoords(AbstractObservers):
 
         To properly report the state from Grumpy's perspective, you'd need to flip everything.
         """
+        if int_team is None:
+            int_team = const.TEAM_HAPPY
+        if obj_robot:
+            raise NotImplementedError("Robot-specific state output not supported.")
 
-        if intTeam == const.TEAM_HAPPY:  # report happy bots first
+        if int_team == const.TEAM_HAPPY:  # report happy bots first
             return np.concatenate((
                 list(map(self._robot_state, self.lstHappyBots)),
                 list(map(self._robot_state, self.lstGrumpyBots)),
@@ -102,6 +109,7 @@ class AllCoords_WithPrior(AllCoords):
                 sprRobot.rectDblPriorStep.centery,
                 sprRobot.rectDblPriorStep.rotation]
 
+
 # endregion
 
 
@@ -122,12 +130,12 @@ class PosBall_BasicLidar(AbstractObservers):
             print("Warning: Observation space/action space is robot-specific (assumes 1 robot per team).")
         super(PosBall_BasicLidar, self).__init__(lst_starting_config)
 
-    def get_game_state(self, intTeam=const.TEAM_HAPPY, obj_robot=None) -> np.ndarray:
+    def get_game_state(self, int_team: int = None, obj_robot: Robot = None, obj_ball: Ball = None) -> np.ndarray:
         if obj_robot:
             return np.asarray(self._robot_state(obj_robot))
-        elif intTeam == const.TEAM_HAPPY and len(self.lstHappyBots) > 0:
+        elif int_team == const.TEAM_HAPPY and len(self.lstHappyBots) > 0:
             return np.asarray(self._robot_state(self.lstHappyBots[0]))
-        elif intTeam == const.TEAM_GRUMPY and len(self.lstGrumpyBots) > 0:
+        elif int_team == const.TEAM_GRUMPY and len(self.lstGrumpyBots) > 0:
             return np.asarray(self._robot_state(self.lstGrumpyBots[0]))
         else:
             return None
@@ -140,53 +148,14 @@ class PosBall_BasicLidar(AbstractObservers):
         """ Calc super primitive lidar extending front/back from center of bot """
         top_a, top_b = sprRobot.rectDbl.side(FloatRect.SideType.TOP)
         bottom_a, bottom_b = sprRobot.rectDbl.side(FloatRect.SideType.BOTTOM)
-        mid_top = Point(x = (top_a.x + top_b.x) / 2, y = (top_a.y + top_b.y) / 2)
-        mid_bot = Point(x = (bottom_a.x + bottom_b.x) / 2, y = (bottom_a.y + bottom_b.y) / 2)
+        mid_top = Point(x=(top_a.x + top_b.x) / 2, y=(top_a.y + top_b.y) / 2)
+        mid_bot = Point(x=(bottom_a.x + bottom_b.x) / 2, y=(bottom_a.y + bottom_b.y) / 2)
 
-        lst_surfaces = [
-            [(0,0), (const.ARENA_WIDTH, 0)],
-            [(const.ARENA_WIDTH, 0), (const.ARENA_WIDTH, const.ARENA_HEIGHT)],
-            [(const.ARENA_WIDTH, const.ARENA_HEIGHT), (0, const.ARENA_HEIGHT)],
-            [(0, const.ARENA_HEIGHT), (0,0)]
-        ]
+        """ Define list of things to check with lidar """
+        other_bots = filter(lambda x: not x is sprRobot, self.lstRobots)
+        lst_objects = list(map(lambda x: x.rectDbl, other_bots)) + [self.rect_walls]
 
-        for other_bot in self.lstRobots:
-            if not other_bot is sprRobot:
-                for a,b in other_bot.rectDbl.sides:
-                    lst_surfaces.append([a,b])
-
-        lst_front = []
-        lst_back = []
-        for side in lst_surfaces:
-            x_i, y_i = get_line_intersection(side, [mid_top, mid_bot])
-            if x_i is None or y_i is None:
-                pass  # doesn't intersect
-
-            elif mid_bot.x < mid_top.x < x_i or \
-                    x_i < mid_top.x < mid_bot.x or \
-                    mid_bot.y < mid_top.y < y_i or \
-                    y_i < mid_top.y < mid_bot.y:
-                """ Viewing this out of the front of the bot """
-                lst_front.append(distance(mid_top, (x_i, y_i)))
-
-            elif mid_top.x < mid_bot.x < x_i or \
-                    x_i < mid_bot.x < mid_top.x or \
-                    mid_top.y < mid_bot.y < y_i or \
-                    y_i < mid_bot.y < mid_top.y:
-                """ Viewing this out of the back of the bot """
-                lst_back.append(distance(mid_bot, (x_i, y_i)))
-
-            elif mid_top.x <= x_i <= mid_bot.x or \
-                    mid_bot.x <= x_i <= mid_top.x or \
-                    mid_top.y <= y_i <= mid_bot.y or \
-                    mid_bot.y <= y_i <= mid_top.y:
-                lst_front.append(0)
-                lst_back.append(0)
-            else:
-                raise Exception("This 'am i looking out front or back?' check is dum.")
-
-        lidar_front = min(lst_front)
-        lidar_back = min(lst_back)
+        lidar_front, lidar_back = TrashyPhysics.two_way_lidar_rect(mid_bot, mid_top, lst_objects)
 
         return [
             float(sprRobot.dblRotation),
@@ -195,3 +164,246 @@ class PosBall_BasicLidar(AbstractObservers):
             float(lidar_front),
             float(lidar_back)
         ]
+
+class SingleBall_6wayLidar(AbstractObservers):
+    """
+    For a given robot and ball, the observation is (not necessarily in this order):
+
+        Bot's current rotation.
+        Rotation to positive ball.
+        Distance to positive ball.
+        Rotation to goal the ball should head towards.
+        Distance to goal the ball should head towards.
+        6 way lidar (front/back/corners)
+
+    If robot/ball aren't defined, it assumes HappyBot[0], PosBall[0].
+
+    TODO delete this version and just use upgraded "v2" version, below (saving for now cuz my saved models
+    would be worthless without it.
+    """
+    def get_game_state(self, int_team: int = None, obj_robot: Robot = None, obj_ball: Ball = None) -> np.ndarray:
+
+        """ Validate """
+        if int_team == const.TEAM_HAPPY and obj_robot is None and len(self.lstHappyBots) == 0:
+            return None
+        if int_team == const.TEAM_GRUMPY and obj_robot is None and len(self.lstGrumpyBots) == 0:
+            return None
+
+        if obj_ball is None:
+            obj_ball = self.lstPosBalls[0]
+        if int_team is not None and obj_robot is not None:
+            assert (obj_robot.intTeam == int_team)
+        elif int_team is None and obj_robot is None:
+            int_team = const.TEAM_HAPPY
+            obj_robot = self.lstHappyBots[0]
+        elif int_team is None:  # and obj_robot is not None
+            int_team = obj_robot.intTeam
+        elif obj_robot is None:  # and int_team is not None
+            obj_robot = self.lstHappyBots[0] if int_team == const.TEAM_HAPPY else self.lstGrumpyBots[0]
+
+        """ DO LIDAR 
+        Front of the robot = Right side of rect (0 rotation)
+        Left side of robot = Top side of rect (90) etc.
+        """
+
+        # TODO this shit is all fucked up
+        # SideType is probably wrong
+        # BUT you could still train with it, technically
+        # it is reporting all the right information, it's just
+        # not in the order that I'm assuming it is here... :(
+
+        front_a, front_b = obj_robot.rectDbl.side(FloatRect.SideType.RIGHT)
+        back_a, back_b = obj_robot.rectDbl.side(FloatRect.SideType.LEFT)
+        mid_front = Point(x=(front_a.x + front_b.x) / 2, y=(front_a.y + front_b.y) / 2)
+        mid_back = Point(x=(back_a.x + back_b.x) / 2, y=(back_a.y + back_b.y) / 2)
+
+        """ Define list of things to check with lidar """
+        other_bots = filter(lambda x: not x is obj_robot, self.lstRobots)
+        lst_objects = list(map(lambda x: x.rectDbl, other_bots)) + [self.rect_walls]
+
+        lidar_front, lidar_back = TrashyPhysics.two_way_lidar_rect(
+            mid_back,
+            mid_front,
+            lst_objects)
+
+        lidar_front_l, lidar_back_r = TrashyPhysics.two_way_lidar_rect(
+            obj_robot.rectDbl.corner(FloatRect.CornerType.BOTTOM_LEFT),
+            obj_robot.rectDbl.corner(FloatRect.CornerType.TOP_RIGHT),
+            lst_objects
+        )
+
+        lidar_front_r, lidar_back_l = TrashyPhysics.two_way_lidar_rect(
+            obj_robot.rectDbl.corner(FloatRect.CornerType.TOP_LEFT),
+            obj_robot.rectDbl.corner(FloatRect.CornerType.BOTTOM_RIGHT),
+            lst_objects
+        )
+
+        """ Gather remaining obs """
+        ball_angle = angle_degrees(obj_robot.rectDbl.center, obj_ball.rectDbl.center)
+        ball_dist = distance(obj_robot.rectDbl.center, obj_ball.rectDbl.center)
+        goal_angle = angle_degrees(obj_robot.rectDbl.center, (const.ARENA_WIDTH, const.ARENA_HEIGHT))
+        bot_angle = obj_robot.dblRotation
+
+        """
+        Standard output is for Happy bot chasing a Positive ball.
+        If team is Grumpy, flip it. If ball is Negative, flip it. 
+        """
+        if (int_team == const.TEAM_HAPPY and obj_ball.is_positive) or \
+                (int_team == const.TEAM_GRUMPY and obj_ball.is_negative):
+
+            goal_dist = distance(obj_robot.rectDbl.center, (const.ARENA_WIDTH, const.ARENA_HEIGHT))
+
+        else:  # flip the observation
+            goal_dist = distance(obj_robot.rectDbl.center, (0,0))
+            ball_angle = (ball_angle + 180) % 360
+            goal_angle = (goal_angle + 180) % 360
+            bot_angle = (bot_angle + 180) % 360
+
+        # Cap lidar at...
+        lidar_cap = 150
+        ball_dist = min(ball_dist, lidar_cap)
+        goal_dist = min(goal_dist, lidar_cap)
+        lidar_front = min(lidar_front, lidar_cap)
+        lidar_back = min(lidar_back, lidar_cap)
+        lidar_front_l = min(lidar_front_l, lidar_cap)
+        lidar_front_r = min(lidar_front_r, lidar_cap)
+        lidar_back_r = min(lidar_back_r, lidar_cap)
+        lidar_back_l = min(lidar_back_l, lidar_cap)
+
+        return np.asarray([
+            float(bot_angle),
+            float(ball_angle),
+            float(ball_dist),
+            float(goal_angle),
+            float(goal_dist),
+            float(lidar_front),
+            float(lidar_front_l),
+            float(lidar_front_r),
+            float(lidar_back),
+            float(lidar_back_l),
+            float(lidar_back_r)
+        ])
+
+class SingleBall_6wayLidar_v2(AbstractObservers):
+    """
+    For a given robot and ball, the observation is (not necessarily in this order):
+
+        Bot's current rotation.
+        Rotation to positive ball.
+        Distance to positive ball.
+        Rotation to goal the ball should head towards.
+        Distance to goal the ball should head towards.
+        6 way lidar (front/back/corners)
+
+    If robot/ball aren't defined, it assumes HappyBot[0], PosBall[0].
+
+    """
+    def get_game_state(self, int_team: int = None, obj_robot: Robot = None, obj_ball: Ball = None) -> np.ndarray:
+
+        """ Validate """
+        if int_team == const.TEAM_HAPPY and obj_robot is None and len(self.lstHappyBots) == 0:
+            return None
+        if int_team == const.TEAM_GRUMPY and obj_robot is None and len(self.lstGrumpyBots) == 0:
+            return None
+
+        if obj_ball is None:
+            obj_ball = self.lstPosBalls[0]
+        if int_team is not None and obj_robot is not None:
+            assert (obj_robot.intTeam == int_team)
+        elif int_team is None and obj_robot is None:
+            int_team = const.TEAM_HAPPY
+            obj_robot = self.lstHappyBots[0]
+        elif int_team is None:  # and obj_robot is not None
+            int_team = obj_robot.intTeam
+        elif obj_robot is None:  # and int_team is not None
+            obj_robot = self.lstHappyBots[0] if int_team == const.TEAM_HAPPY else self.lstGrumpyBots[0]
+
+        """ DO LIDAR 
+        Front of the robot = Right side of rect (0 rotation)
+        Left side of robot = Top side of rect (90) etc.
+        """
+
+        # TODO this shit is all fucked up
+        # SideType is probably wrong
+        # BUT you could still train with it, technically
+        # it is reporting all the right information, it's just
+        # not in the order that I'm assuming it is here... :(
+
+        front_a, front_b = obj_robot.rectDbl.side(FloatRect.SideType.RIGHT)
+        back_a, back_b = obj_robot.rectDbl.side(FloatRect.SideType.LEFT)
+        mid_front = Point(x=(front_a.x + front_b.x) / 2, y=(front_a.y + front_b.y) / 2)
+        mid_back = Point(x=(back_a.x + back_b.x) / 2, y=(back_a.y + back_b.y) / 2)
+
+        """ Define list of things to check with lidar """
+        other_bots = filter(lambda x: not x is obj_robot, self.lstRobots)
+        lst_objects = list(map(lambda x: x.rectDbl, other_bots)) + [self.rect_walls]
+
+        lidar_front, lidar_back = TrashyPhysics.two_way_lidar_rect(
+            mid_back,
+            mid_front,
+            lst_objects)
+
+        lidar_front_l, lidar_back_r = TrashyPhysics.two_way_lidar_rect(
+            obj_robot.rectDbl.corner(FloatRect.CornerType.BOTTOM_LEFT),
+            obj_robot.rectDbl.corner(FloatRect.CornerType.TOP_RIGHT),
+            lst_objects
+        )
+
+        lidar_front_r, lidar_back_l = TrashyPhysics.two_way_lidar_rect(
+            obj_robot.rectDbl.corner(FloatRect.CornerType.TOP_LEFT),
+            obj_robot.rectDbl.corner(FloatRect.CornerType.BOTTOM_RIGHT),
+            lst_objects
+        )
+
+        # Cap lidar at...
+        lidar_cap = 150
+        lidar_front = min(lidar_front, lidar_cap)
+        lidar_back = min(lidar_back, lidar_cap)
+        lidar_front_l = min(lidar_front_l, lidar_cap)
+        lidar_front_r = min(lidar_front_r, lidar_cap)
+        lidar_back_r = min(lidar_back_r, lidar_cap)
+        lidar_back_l = min(lidar_back_l, lidar_cap)
+
+        """ Gather remaining obs """
+        ball_angle = angle_degrees(obj_robot.rectDbl.center, obj_ball.rectDbl.center)
+        ball_dist = distance(obj_robot.rectDbl.center, obj_ball.rectDbl.center)
+        ball_dist = min(ball_dist, lidar_cap)
+        goal_angle = angle_degrees(obj_robot.rectDbl.center, (const.ARENA_WIDTH, const.ARENA_HEIGHT))
+        bot_angle = obj_robot.dblRotation
+
+        goal_dist_cap = max(const.GOAL_WIDTH, const.GOAL_HEIGHT) + lidar_cap
+        bad_goal_dist = distance(obj_robot.rectDbl.center, (0,0))
+        good_goal_dist = distance(obj_robot.rectDbl.center, (const.ARENA_WIDTH, const.ARENA_HEIGHT))
+        if good_goal_dist <= bad_goal_dist:
+            goal_dist = min(good_goal_dist, goal_dist_cap)
+        else:
+            goal_dist = -1 * min(bad_goal_dist, goal_dist_cap)
+
+        """
+        Standard output is for Happy bot chasing a Positive ball.
+        If team is Grumpy, flip it. If ball is Negative, flip it. 
+        """
+        if (int_team == const.TEAM_HAPPY and obj_ball.is_negative) or \
+                (int_team == const.TEAM_GRUMPY and obj_ball.is_positive):
+            # flip the observation
+            goal_dist *= -1
+            ball_angle = (ball_angle + 180) % 360
+            goal_angle = (goal_angle + 180) % 360
+            bot_angle = (bot_angle + 180) % 360
+
+        return np.asarray([
+            float(bot_angle),
+            float(ball_angle),
+            float(ball_dist),
+            float(goal_angle),
+            float(goal_dist),
+            float(lidar_front),
+            float(lidar_front_l),
+            float(lidar_front_r),
+            float(lidar_back),
+            float(lidar_back_l),
+            float(lidar_back_r)
+        ])
+
+
+

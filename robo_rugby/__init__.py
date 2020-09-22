@@ -24,3 +24,11 @@ register(
     nondeterministic=True,  # opposing team will pretty much always be nondeterministic
     reward_threshold=1.0  # no idea
 )
+
+register(
+    id='RoboRugbySimpleDuel-v3',
+    entry_point='robo_rugby.gym_env.RR_Environments:SimpleDuel3',
+    max_episode_steps=const.GAME_LENGTH_STEPS,
+    nondeterministic=True,  # opposing team will pretty much always be nondeterministic
+    reward_threshold=1.0  # no idea
+)
