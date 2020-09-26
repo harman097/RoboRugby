@@ -14,11 +14,12 @@ from PIL import Image
 
 Stage("Initialize pygame")
 pygame.init()
-mScreen = pygame.display.set_mode((const.ARENA_WIDTH, const.ARENA_HEIGHT))
+mScreen = pygame.display.set_mode((const.ARENA_WIDTH + const.DASHBOARD_WIDTH, const.ARENA_HEIGHT))
 
 from robo_rugby.gym_env.RR_Ball import Ball
 from robo_rugby.gym_env.RR_Robot import Robot
 from robo_rugby.gym_env.RR_Goal import Goal
+from robo_rugby.gym_env.RR_Dashboard import Dashboard
 from . import RR_TrashyPhysics as TrashyPhysics
 
 MyUtils.PRINT_STAGE = False  # Disable stage spam
@@ -71,6 +72,9 @@ class GameEnv(gym.Env):
         self.grpAllSprites = pygame.sprite.Group()
         self.lngStepCount = 0
         self.rect_walls = FloatRect(0, const.ARENA_WIDTH, 0, const.ARENA_HEIGHT)
+
+        Stage("Menu for you, sir")
+        self.dashboard = Dashboard()
 
         Stage("Here are the goals")
         self.sprHappyGoal = Goal(const.TEAM_HAPPY)
@@ -216,7 +220,7 @@ class GameEnv(gym.Env):
         Stage("Render RoboRugby!")
         # Clear the screen
         mScreen.fill(const.COLOR_BACKGROUND)
-
+        
         pygame.draw.circle(mScreen, (255, 255, 0), (400, 400), 200)
 
         # Redraw each sprite in their relative "z" order
@@ -228,6 +232,14 @@ class GameEnv(gym.Env):
 
         for objSprite in self.grpBalls:
             mScreen.blit(objSprite.surf, objSprite.rect)
+                        
+        self.dashboard.update(mScreen, 
+                              {"Score, Happy": self.sprHappyGoal.get_score(), 
+                               "Score, Grumpy": self.sprGrumpyGoal.get_score()
+                               })
+        
+        
+        
 
         # update the display
         pygame.display.flip()
