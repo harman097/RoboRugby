@@ -47,12 +47,14 @@ class Robot(pygame.sprite.Sprite):
             return self.rectDbl.copy()
 
         rectPrior = self.rectDbl.copy()
-        rectPrior.centerx, rectPrior.centery, rectPrior.rotation, lngMC = self._lstStates[lngI]
+        x, y, rot, lngMC = self._lstStates[lngI]
         if lngMC != self.lngMoveCount - 1:
             # raise Exception(f"How...? {lngMC} != {self.lngMoveCount - 1}")
             print(f"How...? {lngMC} != {self.lngMoveCount - 1}")
-            return self.rectDbl.copy()
+            return rectPrior
 
+        rectPrior.center = (x,y)
+        rectPrior.rotation = rot
         return rectPrior
 
 
@@ -104,7 +106,6 @@ class Robot(pygame.sprite.Sprite):
     def move(self):
         self.lngMoveCount += 1
         self._move_internal(1)
-        self._store_state()
 
     def undo_move(self) -> bool:
         if self._try_restore_state(self.lngMoveCount - 1):
@@ -114,6 +115,9 @@ class Robot(pygame.sprite.Sprite):
 
     def on_step_begin(self):
         self.rectDblPriorStep = self.rectDbl.copy()
+
+    def on_frame_begin(self):
+        self._store_state()
 
     def _try_restore_state(self, lngMoveCount: int) -> bool:
         intI = lngMoveCount % self._slngMoveHistorySize
@@ -128,8 +132,7 @@ class Robot(pygame.sprite.Sprite):
 
         self.rectDbl.centerx = dblCx
         self.rectDbl.centery = dblCy
-        if dblRot != self.rectDbl.rotation:
-            self.rectDbl.rotation = dblRot
+        self.rectDbl.rotation = dblRot
 
         return True
 
