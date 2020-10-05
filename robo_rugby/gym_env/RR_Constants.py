@@ -11,8 +11,8 @@ ROBOT_WIDTH_BODY = 32
 ROBOT_WIDTH_TRACKS = 8
 ROBOT_VEL = 12 if GAME_MODE else 12  # Std game mode = 3
 MOVES_PER_FRAME = ROBOT_VEL
-ROBOT_ANGULAR_VEL_ONE = .9  # Std game mode .9  # one motor rotating around other track
-ROBOT_ANGULAR_VEL_BOTH = 1.5  # Std game mode 1.5  # with both motors engaged
+ROBOT_ANGULAR_VEL_ONE = .6  # Std game mode .9  # one motor rotating around other track
+ROBOT_ANGULAR_VEL_BOTH = 1.2  # Std game mode 1.5  # with both motors engaged
 GOAL_WIDTH = 240
 GOAL_HEIGHT = 240
 

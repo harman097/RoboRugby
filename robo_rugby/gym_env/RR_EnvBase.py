@@ -413,7 +413,10 @@ class GameEnv(gym.Env):
         while bln_naughty:
             lng_naughty_loop_count += 1
             if lng_naughty_loop_count > lng_naughty_loop_limit:
-                raise Exception("UNABLE TO RESOLVE ALL COLLISIONS FOR FRAME")
+                if const.GAME_MODE:
+                    print("WARNING: UNABLE TO RESOLVE ALL COLLISIONS FOR FRAME.")
+                else:
+                    raise Exception("UNABLE TO RESOLVE ALL COLLISIONS FOR FRAME")
             set_naughty_bots = set()
             set_naughty_balls = set()
 
