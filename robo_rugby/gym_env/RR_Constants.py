@@ -1,7 +1,7 @@
 import pygame
 import math
 
-GAME_MODE = False
+GAME_MODE = True
 
 ARENA_WIDTH = 800 if GAME_MODE else 600
 ARENA_HEIGHT = 800 if GAME_MODE else 600
@@ -10,9 +10,9 @@ ROBOT_WIDTH = 40
 ROBOT_WIDTH_BODY = 32
 ROBOT_WIDTH_TRACKS = 8
 ROBOT_VEL = 12 if GAME_MODE else 12  # Std game mode = 3
-MOVES_PER_FRAME = 1  #ROBOT_VEL
-ROBOT_ANGULAR_VEL_ONE = .6  # Std game mode .9  # one motor rotating around other track
-ROBOT_ANGULAR_VEL_BOTH = 1  # Std game mode 1.5  # with both motors engaged
+MOVES_PER_FRAME = ROBOT_VEL
+ROBOT_ANGULAR_VEL_ONE = .9  # Std game mode .9  # one motor rotating around other track
+ROBOT_ANGULAR_VEL_BOTH = 1.5  # Std game mode 1.5  # with both motors engaged
 GOAL_WIDTH = 240
 GOAL_HEIGHT = 240
 
@@ -52,6 +52,7 @@ POINTS_ROBOT_TRAVEL_MULT = POINTS_BALL_TRAVEL_MULT / 100  # for now
 TEAM_HAPPY = 1
 TEAM_GRUMPY = -1
 
+
 # NN controls (most likely)
 KEY_LEFT_MOTOR_FORWARD = pygame.K_i
 KEY_LEFT_MOTOR_BACKWARD = pygame.K_k
@@ -72,6 +73,9 @@ COLOR_BALL_POS = (80,220,100)
 COLOR_BALL_NEG = (60,16,83)
 COLOR_GOAL_HAPPY = (43, 146, 228)
 COLOR_GOAL_GRUMPY = (242, 53, 87)
+COLOR_DASHBOARD_FILL = (200,200,200)
+COLOR_DASHBOARD_BORDER = (0,0,0)
+COLOR_DASHBOARD_TEXT = (0,0,0)
 
 # Calculation parameters
 CALC_DIST_TRACK_CENTER_TO_ROBOT_CENTER = (ROBOT_WIDTH/2) - (ROBOT_WIDTH_TRACKS/2)
@@ -86,3 +90,10 @@ BOUNCE_K_BALL = .995
 MASS_BALL = 1
 MASS_ROBOT = 2
 MASS_WALL = 3
+
+#Dashboard
+DASHBOARD_WIDTH = 300
+DASHBOARD_BORDER_WIDTH = 10
+DASHBOARD_FONT = 'droidsansmonoslashed'
+DASHBOARD_FONT_SIZE_TITLE = 30
+DASHBOARD_FONT_SIZE_INFO = 15
