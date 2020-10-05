@@ -249,13 +249,10 @@ class GameEnv(gym.Env):
         if self.game_is_done():
             raise Exception("Game is over. Go home.")
 
-        Stage("Initialize")
         self.lngStepCount += 1
-        setBallsInGoal = set()
-
         self.on_step_begin()
 
-        Stage("Activate robot engines!")
+        """ Activate robot engines! """
         # flatten args into 1-D array, if they're not already (tf passes like this)
         arr_args = np.concatenate(lstArgs, axis=None)
         if len(arr_args) > const.NUM_ROBOTS_TOTAL * 2:
@@ -265,55 +262,185 @@ class GameEnv(gym.Env):
 
         for _ in range(const.MOVES_PER_FRAME):
 
-            # Typehint all the loop variables we're going to use
-            # so Pycharm will make our lives easier
-            sprRobot: Robot
-            sprRobot1: Robot
-            sprRobot2: Robot
-            sprBall: Ball
-            sprBall1: Ball
-            sprBall2: Ball
+            set_bots_that_moved = set(self.lstRobots)
+            set_balls_that_moved = set(self.lstBalls)
+            
+            self.on_frame_begin()
+            self._move_bots()
+            self._resolve_bot_collisions(set_bots_that_moved)
+            self._push_balls()
+            self._roll_balls()
+            if not self._resolve_ball_collisions():
+                self._undo_naughty_movement(set_balls_that_moved, set_bots_that_moved)
+            self.on_frame_end()
 
-            Stage("Move those robots!")
-            for sprRobot in self.grpRobots.sprites():
-                sprRobot.move()
+        self.on_step_end()
 
-            Stage("Did they smash each other?")
-            for sprRobot1, sprRobot2 in TrashyPhysics.collision_pairs_self(
-                    self.grpRobots, fncCollided=TrashyPhysics.robots_collided):
+        return self.get_game_state(), \
+               self.get_reward(int_team=const.TEAM_HAPPY), \
+               self.game_is_done(), \
+               GameEnv.DebugInfo(
+                   self.get_game_state(int_team=const.TEAM_GRUMPY),
+                   self.get_reward(int_team=const.TEAM_GRUMPY)
+               )
 
-                self.on_robot_collision(sprRobot1, sprRobot2)
+    def _move_bots(self):
+        for robot in self.lstRobots:
+            robot.move()
 
-                lngNaughtyLoop = 0
-                while True:
-                    lngNaughtyLoop += 1
-                    sprRobot1.undo_move()
-                    sprRobot2.undo_move()
-                    if not TrashyPhysics.robots_collided(sprRobot1, sprRobot2):
-                        break
-                    elif lngNaughtyLoop > 1000:
-                        print("------ DUDE we hit the naughty loop limit... wut --------")
-                        # raise Exception("Dude this is seriously broken")
-                        break
+    def _resolve_bot_collisions(self, set_bots_that_moved:Set[Robot]):
 
-            Stage("Push those balls!")
-            for sprBall, sprRobot in TrashyPhysics.collision_pairs(
-                    self.grpBalls, self.grpRobots, fncCollided=TrashyPhysics.ball_robot_collided):
-                TrashyPhysics.apply_force_to_ball(sprRobot, sprBall)
+        lst_bot_collisions = TrashyPhysics.collision_pairs_self(
+                self.grpRobots, fncCollided=TrashyPhysics.robots_collided)
+        lng_attempts = 0
+        lng_attempt_limit = len(self.lstRobots)  # Max possible needed (conga line and the first guy doesn't move)
 
-            Stage("Roll the balls!")
-            for sprBall in self.grpBalls.sprites():
-                sprBall.move()
+        while len(lst_bot_collisions) > 0:
+            lng_attempts += 1
+            if lng_attempts >= lng_attempt_limit:
+                raise Exception("UNABLE TO RESOLVE BOT/BOT COLLISIONS")
 
-            Stage("Bounce the balls!")
+            for bot1, bot2 in lst_bot_collisions:
+                self.on_robot_collision(bot1, bot2)
+
+                """ Undo move for each robot, if possible """
+                bln_stuck = True
+                robot :Robot
+                for robot in [bot1, bot2]:
+                    if robot in set_bots_that_moved:
+                        set_bots_that_moved.remove(robot)
+                        if not robot.undo_move():
+                            raise Exception(f"UNABLE TO UNDO MOVE FOR ROBOT: {robot}")
+                        bln_stuck = False
+                if bln_stuck:
+                    raise Exception("""ROBOTS STUCK FROM PRIOR FRAME.
+                    Collisions should be fully resolved at the end of each frame.
+                    """)
+
+            lst_bot_collisions = TrashyPhysics.collision_pairs_self(
+                self.grpRobots, fncCollided=TrashyPhysics.robots_collided)
+
+    def _push_balls(self):
+        for sprBall, sprRobot in TrashyPhysics.collision_pairs(
+                self.grpBalls, self.grpRobots, fncCollided=TrashyPhysics.ball_robot_collided):
+            TrashyPhysics.apply_force_to_ball(sprRobot, sprBall)
+            TrashyPhysics.bounce_ball_off_bot(sprRobot, sprBall)
+
+    def _roll_balls(self):
+        for ball in self.lstBalls:
+            ball.move()
+
+    def _resolve_ball_collisions(self) -> bool:
+        """ Rough pseudo
+        (6) TryResolve loop
+            Naughty = True
+            While Naughty:
+                Naughty = False
+                (6a) Resolve ball/ball collisions (bounce)
+                (6b) Resolve ball/bot collisions (bounce)
+                (6c) Resolve ball/wall collisions (bounce)
+                (6d) Resolve ball/bumper collisions (bounce)
+                Naughty = True so long as there are any
+                TryResolveLoopLimit? Break
+
+        :param set_balls_that_moved:
+        :param set_bots_that_moved:
+        :return: Bool: Were all collisions resolved?
+        """
+
+        bln_naughty = True
+        lng_naughty_loop_count = 0
+        lng_naughty_loop_limit = 10
+        while bln_naughty:
+            lng_naughty_loop_count += 1
+            if lng_naughty_loop_count > lng_naughty_loop_limit:
+                return False
+            bln_naughty = False
+
+            """ Ball vs Ball """
             for sprBall1, sprBall2 in TrashyPhysics.collision_pairs_self(
                     self.grpBalls, fncCollided=TrashyPhysics.balls_collided):
+                bln_naughty = True
                 TrashyPhysics.bounce_balls(sprBall1, sprBall2)
 
-            Stage("Are robots still being naughty? Deny movement.")
+            """ Ball vs Bot """
             for sprBall, sprRobot in TrashyPhysics.collision_pairs(
-                    self.grpBalls, self.grpRobots, fncCollided=TrashyPhysics.ball_robot_collided):
-                sprRobot.undo_move()
+                    self.grpBalls, self.grpRobots,
+                    fncCollided=TrashyPhysics.ball_robot_collided):
+                bln_naughty = True
+                TrashyPhysics.bounce_ball_off_bot(sprRobot, sprBall)
+
+            """ Ball vs Wall """
+            for ball in filter(lambda x: TrashyPhysics.collided_wall(x), self.lstBalls):
+                bln_naughty = True
+                TrashyPhysics.bounce_ball_off_wall(ball)
+
+            """ Ball vs Bumper """
+            # todo
+
+    def _undo_naughty_movement(self, set_balls_that_moved :Set[Ball], set_bots_that_moved :Set[Robot]):
+        """ Rough pseudo
+        (7) UndoNaughty loop
+            While Naughty:
+                Naughty = False
+                (7a) Undo moves for ball/ball collisions (remove from set of _ who moved)
+                (7b) Undo moves for ball/bot collisions (remove from set of _ who moved)
+                (7c) Undo moves for ball/wall collisions (bounce) (remove from set of _ who moved)
+                (7d) Undo moves for ball/bumper collisions (bounce) (remove from set of _ who moved)
+                Naughty = True so long as there are any
+                UndoNaughtyLoopLimit? BOM
+        :param set_balls_that_moved:
+        :param set_bots_that_moved:
+        :return:
+        """
+        ball :Ball
+        bot :Robot
+        bln_naughty = True
+        lng_naughty_loop_count = 0
+        lng_naughty_loop_limit = len(self.lstBalls) + len(self.lstRobots)  # worst case scenario
+        while bln_naughty:
+            lng_naughty_loop_count += 1
+            if lng_naughty_loop_count > lng_naughty_loop_limit:
+                raise Exception("UNABLE TO RESOLVE ALL COLLISIONS FOR FRAME")
+            set_naughty_bots = set()
+            set_naughty_balls = set()
+
+            """ Ball vs Ball """
+            for ball1, ball2 in TrashyPhysics.collision_pairs_self(
+                    self.grpBalls, fncCollided=TrashyPhysics.balls_collided):
+                set_naughty_balls.add(ball1)
+                set_naughty_balls.add(ball2)
+
+            """ Ball vs Bot """
+            for ball, bot in TrashyPhysics.collision_pairs(
+                    self.grpBalls, self.grpRobots,
+                    fncCollided=TrashyPhysics.ball_robot_collided):
+                set_naughty_balls.add(ball)
+                set_naughty_bots.add(bot)
+
+            """ Ball vs Wall """
+            for ball in filter(lambda x: TrashyPhysics.collided_wall(x), self.lstBalls):
+                set_naughty_balls.add(ball)
+
+            """ Ball vs Bumper """
+            # todo
+
+            """ Undo movement. """
+            bln_naughty = len(set_naughty_bots) + len(set_naughty_balls) > 0
+            for bot in set_bots_that_moved & set_naughty_bots:
+                set_bots_that_moved.remove(bot)
+                if not bot.undo_move():
+                    print(f"UNABLE TO UNDO MOVE FOR BOT: {bot}")
+            for ball in set_balls_that_moved & set_naughty_balls:
+                set_balls_that_moved.remove(ball)
+                if not ball.undo_move():
+                    print(f"UNABLE TO UNDO MOVE FOR BALL: {ball}")
+
+
+
+    def __old_step(self):
+
+        setBallsInGoal = set()
 
         Stage("Flag balls in the goal")  # todo use event system
         self.sprHappyGoal.track_balls(self.grpBalls.sprites())
@@ -384,6 +511,16 @@ class GameEnv(gym.Env):
         for sprSprite in self.grpAllSprites:
             if hasattr(sprSprite, 'on_step_end'):
                 sprSprite.on_step_end()
+
+    def on_frame_begin(self):
+        for sprSprite in self.grpAllSprites:
+            if hasattr(sprSprite, 'on_frame_begin'):
+                sprSprite.on_frame_begin()
+
+    def on_frame_end(self):
+        for sprSprite in self.grpAllSprites:
+            if hasattr(sprSprite, 'on_frame_end'):
+                sprSprite.on_frame_end()
 
     def on_robot_collision(self, bot1: Robot, bot2: Robot):
         pass  # override in child class

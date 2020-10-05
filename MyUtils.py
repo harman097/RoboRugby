@@ -24,10 +24,21 @@ def Div0(pdblNumerator: float, pdblDenominator: float) -> float:
     else:
         raise ZeroDivisionError("Numerator AND Denominator are both 0.")
 
-Point = namedtuple('Point', ['x', 'y'])
 
-def distance(tplA :Tuple[float,float], tplB :Tuple[float,float]) -> float:
-    return math.pow((tplB[0] - tplA[0])**2 + (tplB[1] - tplA[1])**2, .5)
+Line = namedtuple('Line', ['a', 'b'])
+X_Y_Coord = namedtuple('X_Y_Coord', ['x', 'y'])
+
+
+class Point(X_Y_Coord):
+    pass
+
+
+class Vec2D(X_Y_Coord):
+    pass
+
+
+def distance(tplA: Tuple[float, float], tplB: Tuple[float, float]) -> float:
+    return math.pow((tplB[0] - tplA[0]) ** 2 + (tplB[1] - tplA[1]) ** 2, .5)
 
 
 def get_slope_yint(tpl_a: Tuple[float, float], tpl_b: Tuple[float, float]) -> Tuple[float, float]:
@@ -46,9 +57,9 @@ def get_slope_yint(tpl_a: Tuple[float, float], tpl_b: Tuple[float, float]) -> Tu
         b = tpl_a[1] - tpl_a[0] * m
         return m, b
 
-def get_line_intersection(line_1 :Tuple[Tuple[float, float],Tuple[float, float]],
-                          line_2 :Tuple[Tuple[float, float],Tuple[float, float]]) -> Tuple[float, float]:
 
+def get_line_intersection(line_1: Tuple[Tuple[float, float], Tuple[float, float]],
+                          line_2: Tuple[Tuple[float, float], Tuple[float, float]]) -> Tuple[float, float]:
     if len(line_1) != 2 or len(line_2) != 2:
         raise Exception("Invalid parameters. Expecting two points per line.")
     m_1, b_1 = get_slope_yint(line_1[0], line_1[1])
@@ -59,20 +70,31 @@ def get_line_intersection(line_1 :Tuple[Tuple[float, float],Tuple[float, float]]
 
     if math.isinf(m_1):
         x_I = line_1[0][0]
-        y_I = m_2*x_I + b_2
+        y_I = m_2 * x_I + b_2
     elif math.isinf(m_2):
         x_I = line_2[0][0]
-        y_I = m_1*x_I + b_1
+        y_I = m_1 * x_I + b_1
     else:
         x_I = (b_1 - b_2) / (m_2 - m_1)
         y_I = m_1 * x_I + b_1
 
     return Point(x=x_I, y=y_I)
 
-def angle_degrees(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float:
+
+def point_within_line(pnt: Tuple[float, float],
+                      line: Tuple[Tuple[float, float], Tuple[float, float]],
+                      buffer :float = 0) -> bool:
+    return (line[0][0] - buffer <= pnt[0] <= line[1][0] + buffer or
+            line[1][0] - buffer <= pnt[0] <= line[0][0] + buffer) and \
+           (line[0][1] - buffer <= pnt[1] <= line[1][1] + buffer or
+            line[1][1] - buffer <= pnt[1] <= line[0][1] + buffer)
+
+
+def angle_degrees(tpl_a: Tuple[float, float], tpl_b: Tuple[float, float]) -> float:
     return (math.degrees(angle_radians(tpl_a, tpl_b)) + 720) % 360
 
-def angle_radians(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float:
+
+def angle_radians(tpl_a: Tuple[float, float], tpl_b: Tuple[float, float]) -> float:
     d_y = tpl_b[1] - tpl_a[1]
     d_x = tpl_b[0] - tpl_a[0]
     ang = math.atan(Div0(d_y, d_x))
@@ -82,7 +104,6 @@ def angle_radians(tpl_a :Tuple[float,float], tpl_b :Tuple[float,float]) -> float
         ang += math.pi
     # flip due to our crappy mirrored y-axis
     return 2 * math.pi - ang
-
 
 
 # pygame rects are just ints, unfortunately, which makes any physics difficult
@@ -105,15 +126,15 @@ class FloatRect:
         self._dblRotation = 0
 
         self._dctInitialCornersRelCenter = {  # type: Dict[FloatRect.CornerType, Point]
-            FloatRect.CornerType.TOP_LEFT: Point(x=dblLeft - self._dblCenterX, y=dblTop - self._dblCenterY),
-            FloatRect.CornerType.TOP_RIGHT: Point(x=dblRight - self._dblCenterX,y=dblTop - self._dblCenterY),
-            FloatRect.CornerType.BOTTOM_LEFT: Point(x=dblLeft - self._dblCenterX, y=dblBottom - self._dblCenterY),
-            FloatRect.CornerType.BOTTOM_RIGHT: Point(x=dblRight - self._dblCenterX, y=dblBottom - self._dblCenterY)
+            FloatRect.CornerType.TOP_LEFT: Point(x=-self._dblWidth / 2, y=-self._dblHeight / 2),
+            FloatRect.CornerType.TOP_RIGHT: Point(x=self._dblWidth / 2, y=-self._dblHeight / 2),
+            FloatRect.CornerType.BOTTOM_LEFT: Point(x=-self._dblWidth / 2, y=self._dblHeight / 2),
+            FloatRect.CornerType.BOTTOM_RIGHT: Point(x=self._dblWidth / 2, y=self._dblHeight / 2),
         }
 
         self._dctCornersRelCenter = self._dctInitialCornersRelCenter.copy()  # type: Dict[FloatRect.CornerType, Point]
 
-    def _move_linear(self, dblDeltaX :float, dblDeltaY :float):
+    def _move_linear(self, dblDeltaX: float, dblDeltaY: float):
         self._dblCenterX += dblDeltaX
         self._dblLeft += dblDeltaX
         self._dblRight += dblDeltaX
@@ -123,11 +144,12 @@ class FloatRect:
         self._dblBottom += dblDeltaY
 
     def copy(self) -> 'FloatRect':
-        rectNew = FloatRect(self.left, self.right, self.top, self.bottom)
+        rectNew = FloatRect(0, self._dblWidth, 0, self._dblHeight)
+        rectNew.center = self.center
         rectNew.rotation = self.rotation
         return rectNew
 
-#region Properties/Getters/Setters
+    # region Properties/Getters/Setters
 
     # Getters
     @property
@@ -180,30 +202,30 @@ class FloatRect:
     def corners(self) -> List[Point]:
         return list(map(self.corner, FloatRect.CornerType))
 
-    def side(self, enmSide: 'FloatRect.SideType') -> Tuple[Point,Point]:
+    def side(self, enmSide: 'FloatRect.SideType') -> Line:
         if enmSide == FloatRect.SideType.RIGHT:
-            return (
-                self.corner(FloatRect.CornerType.TOP_RIGHT),
-                self.corner(FloatRect.CornerType.BOTTOM_RIGHT)
+            return Line(
+                a=self.corner(FloatRect.CornerType.TOP_RIGHT),
+                b=self.corner(FloatRect.CornerType.BOTTOM_RIGHT)
             )
         elif enmSide == FloatRect.SideType.TOP:
-            return (
-                self.corner(FloatRect.CornerType.TOP_LEFT),
-                self.corner(FloatRect.CornerType.TOP_RIGHT)
+            return Line(
+                a=self.corner(FloatRect.CornerType.TOP_LEFT),
+                b=self.corner(FloatRect.CornerType.TOP_RIGHT)
             )
         elif enmSide == FloatRect.SideType.LEFT:
-            return (
-                self.corner(FloatRect.CornerType.BOTTOM_LEFT),
-                self.corner(FloatRect.CornerType.TOP_LEFT)
+            return Line(
+                a=self.corner(FloatRect.CornerType.BOTTOM_LEFT),
+                b=self.corner(FloatRect.CornerType.TOP_LEFT)
             )
         elif enmSide == FloatRect.SideType.BOTTOM:
-            return (
-                self.corner(FloatRect.CornerType.BOTTOM_RIGHT),
-                self.corner(FloatRect.CornerType.BOTTOM_LEFT)
+            return Line(
+                a=self.corner(FloatRect.CornerType.BOTTOM_RIGHT),
+                b=self.corner(FloatRect.CornerType.BOTTOM_LEFT)
             )
 
     @property
-    def sides(self) -> List[Tuple[Point, Point]]:
+    def sides(self) -> List[Line]:
         return list(map(self.side, FloatRect.SideType))
 
     def side_as_right_triangle(self, enmSide: 'FloatRect.SideType') -> 'RightTriangle':
@@ -218,8 +240,6 @@ class FloatRect:
 
     def sides_as_right_triangles(self) -> List['RightTriangle']:
         return list(map(self.side_as_right_triangle, FloatRect.SideType))
-
-
 
     # Setters
     @top.setter
@@ -251,12 +271,13 @@ class FloatRect:
         self.centerx, self.centery = tplCenter
 
     @rotation.setter
-    def rotation(self, dblRotation):
-        if dblRotation == self._dblRotation:
+    def rotation(self, dbl_new_rot):
+        dbl_new_rot = (dbl_new_rot + 720) % 360
+        if dbl_new_rot == self._dblRotation:
             return
 
-        self._dblRotation = dblRotation % 360
-        dblRotRadians = math.radians(360 - dblRotation)  # because y is flipped
+        self._dblRotation = dbl_new_rot
+        dblRotRadians = math.radians(360 - dbl_new_rot)  # because y is flipped
         dblCos = math.cos(dblRotRadians)
         dblSin = math.sin(dblRotRadians)
 
@@ -271,8 +292,8 @@ class FloatRect:
         for tplKV in self._dctCornersRelCenter.items():
             enmCornerType, tplCorner = tplKV  # unpack
             tplRotatedCorner = Point(
-                x=-1 * tplCorner.x * dblCos + tplCorner.y * dblSin,
-                y=-1 * tplCorner.x * dblSin - tplCorner.y * dblCos
+                x= tplCorner.x * dblCos - tplCorner.y * dblSin,
+                y= tplCorner.x * dblSin + tplCorner.y * dblCos
             )
             self._dctCornersRelCenter[enmCornerType] = tplRotatedCorner
             setX.add(tplRotatedCorner.x)
@@ -284,7 +305,7 @@ class FloatRect:
         self._dblTop = min(setY) + self.centery
         self._dblBottom = max(setY) + self.centery
 
-#endregion
+    # endregion
 
     class CornerType(Enum):
         TOP_LEFT = 0
@@ -298,8 +319,8 @@ class FloatRect:
         LEFT = 180  # side that is at 180 deg from center, relative to rect's rotation
         BOTTOM = 270  # side that is at 270 deg from center, relative to rect's rotation
 
-    def contains_point(self, tplPoint: Tuple[float,float]) -> bool:
-        dblX, dblY = tplPoint # unpack
+    def contains_point(self, tplPoint: Tuple[float, float]) -> bool:
+        dblX, dblY = tplPoint  # unpack
         if (self.left <= dblX <= self.right) and (self.top <= dblY <= self.bottom):
             if round(self.rotation % 90) == 0 or round(self.rotation % 90) == 90:
                 return True
@@ -316,8 +337,9 @@ class FloatRect:
         else:
             return False
 
+
 class RightTriangle():
-    def __init__(self, tpl1 :Tuple[float,float], tpl2 :Tuple[float,float], tpl3 :Tuple[float,float]):
+    def __init__(self, tpl1: Tuple[float, float], tpl2: Tuple[float, float], tpl3: Tuple[float, float]):
         setX = set()
         setY = set()
         setPoints = {Point(*tpl1), Point(*tpl2), Point(*tpl3)}
@@ -397,20 +419,11 @@ class RightTriangle():
     def corners(self) -> List[Point]:
         return [self.tplHyp0, self.tplHyp1, self.tpl90]
 
-    def contains_point(self, tplPoint: Tuple[float,float]) -> bool:
-        dblX, dblY = tplPoint # unpack
+    def contains_point(self, tplPoint: Tuple[float, float]) -> bool:
+        dblX, dblY = tplPoint  # unpack
         if (self.left <= dblX <= self.right) and (self.top <= dblY <= self.bottom):
             dblSlopeHyp = Div0(self.tplHyp1.y - self.tplHyp0.y, self.tplHyp1.x - self.tplHyp0.x)
             dblSlopePnt = Div0(dblY - self.tplHyp0.y, dblX - self.tplHyp0.x)
             return dblSlopePnt >= dblSlopeHyp
         else:
             return False
-
-
-
-
-
-
-
-
-
