@@ -25,7 +25,7 @@ import pickle
 class DeepQNetwork(nn.Module):
     """ Inheriting from nn.Module gives us stuff like backpropagation """
 
-    def __init__(self, lr, input_dims, fc1_dims, fc2_dims, n_actions):
+    def __init__(self, lr, input_dims, fc1_dims, fc2_dims, n_actions, fc3_dims=256):
         """
 
         :param lr: learning rate
@@ -38,6 +38,7 @@ class DeepQNetwork(nn.Module):
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
+        self.fc3_dims = fc3_dims
         self.n_actions = n_actions
 
         # * operator is unpacking the list
@@ -48,17 +49,15 @@ class DeepQNetwork(nn.Module):
         self.loss = nn.MSELoss()
         # self.device = T.device("cuda:0" if T.cuda.is_available() else "cpu")
         self.device = T.device("cpu")
+        self.to(self.device)
 
     def __call__(self, state):
         return self.forward(state)
 
     def forward(self, state):
         var = F.relu(self.fc1(state.float()))
-        var = F.relu(var)
         var = F.relu(self.fc2(var))
-        var = F.relu(var)
         actions = self.fc3(var)
-
         return actions
 
     def save_checkpoint(self, str_file):
@@ -70,9 +69,9 @@ class DeepQNetwork(nn.Module):
 
 class DQNAgent():
     def __init__(self, gamma, epsilon, lr, input_dims, batch_size, n_actions,
-                 max_mem_size=100000, eps_end=0.01, eps_dec=5e-4,
+                 max_mem_size=500000, eps_end=0.01, eps_dec=5e-4,
                  fc1_dims=256, fc2_dims=256,
-                 target_update_freq=50000):
+                 target_update_freq=100000):
         #          gamma_inc=.1,
         #          gamma_end=.99):
         """
@@ -116,7 +115,8 @@ class DQNAgent():
         chase. In addition, parameter changes do not impact θ- immediately and therefore even the input may 
         not be 100% i.i.d., it will not incorrectly magnify its effect as mentioned before.
         """
-        self.Q_target = copy.deepcopy(self.Q_eval)  # todo verify this actually works
+        self.Q_target = copy.deepcopy(self.Q_eval)
+        self.Q_target.to(self.Q_target.device)
 
         self.state_memory = np.zeros((self.mem_size, *input_dims), dtype=np.float32)
         self.new_state_memory = np.zeros((self.mem_size, *input_dims), dtype=np.float32)
@@ -186,6 +186,7 @@ class DQNAgent():
 
         if self.mem_cntr % self.target_update_freq == 0:
             self.Q_target = copy.deepcopy(self.Q_eval)
+            self.Q_target.to(self.Q_target.device)
 
         self.epsilon = max(self.epsilon * self.eps_dec, self.eps_end)
 
@@ -253,10 +254,10 @@ if __name__ == "__main__":
         epsilon=1.0,
         lr=.0005,  # 0.001,
         input_dims=env.observation_space.shape,
-        batch_size=env.spec.max_episode_steps * 20 + 100,
+        batch_size=env.spec.max_episode_steps * 8 + 100,
         n_actions=len(GameEnv_Simple.Direction),
         eps_end=0.2,
-        eps_dec=.999998,
+        eps_dec=.999997,
         fc1_dims=256,
         fc2_dims=256
     )
@@ -271,8 +272,8 @@ if __name__ == "__main__":
     SHOULD WE LOAD A CHECKPOINT OR NOT? (CAREFUL WITH THIS)
     """
 
-    lng_start_episode = 500  # 6000
-    str_session = "2020_09_21__22_07"  # "2020_09_21__09_36"
+    lng_start_episode = 0  # 6000
+    str_session = ""  # "2020_09_21__09_36"
     lr_override = 0.0  # .00001
     epsilon_override = .9
     eps_dec_override = .9999995
