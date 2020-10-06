@@ -390,6 +390,8 @@ class GameEnv(gym.Env):
             """ Ball vs Bumper """
             # todo
 
+        return True
+
     def _undo_naughty_movement(self, set_balls_that_moved :Set[Ball], set_bots_that_moved :Set[Robot]):
         """ Rough pseudo
         (7) UndoNaughty loop

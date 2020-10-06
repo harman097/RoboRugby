@@ -120,9 +120,7 @@ class FloatRect:
         self._dblCenterX = (dblLeft + dblRight) / 2
         self._dblCenterY = (dblTop + dblBottom) / 2
         self._dblLeft = dblLeft
-        self._dblRight = dblRight
         self._dblTop = dblTop
-        self._dblBottom = dblBottom
         self._dblRotation = 0
 
         self._dctInitialCornersRelCenter = {  # type: Dict[FloatRect.CornerType, Point]
@@ -137,11 +135,9 @@ class FloatRect:
     def _move_linear(self, dblDeltaX: float, dblDeltaY: float):
         self._dblCenterX += dblDeltaX
         self._dblLeft += dblDeltaX
-        self._dblRight += dblDeltaX
 
         self._dblCenterY += dblDeltaY
         self._dblTop += dblDeltaY
-        self._dblBottom += dblDeltaY
 
     def copy(self) -> 'FloatRect':
         rectNew = FloatRect(0, self._dblWidth, 0, self._dblHeight)
@@ -158,11 +154,11 @@ class FloatRect:
 
     @property
     def right(self) -> float:
-        return self._dblRight
+        return self._dblLeft + self._dblWidth
 
     @property
     def bottom(self) -> float:
-        return self._dblBottom
+        return self._dblTop + self._dblHeight
 
     @property
     def left(self) -> float:
@@ -248,11 +244,11 @@ class FloatRect:
 
     @bottom.setter
     def bottom(self, dblBottom: float):
-        self._move_linear(0, dblBottom - self._dblBottom)
+        self._move_linear(0, dblBottom - self.bottom)
 
     @right.setter
     def right(self, dblRight: float):
-        self._move_linear(dblRight - self._dblRight, 0)
+        self._move_linear(dblRight - self.right, 0)
 
     @left.setter
     def left(self, dblLeft: float):
@@ -301,9 +297,7 @@ class FloatRect:
 
         # update l,r,t,b to reflect new rotation
         self._dblLeft = min(setX) + self.centerx
-        self._dblRight = max(setX) + self.centerx
         self._dblTop = min(setY) + self.centery
-        self._dblBottom = max(setY) + self.centery
 
     # endregion
 
