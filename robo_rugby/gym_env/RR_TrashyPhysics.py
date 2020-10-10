@@ -45,51 +45,35 @@ _rectBallInner = FloatRect(
 _dblBallRadius_Sq = const.BALL_RADIUS * const.BALL_RADIUS
 
 
-def ball_robot_collided(sprBall: 'Ball', sprRobot: 'Robot') -> bool:
-    if not pygame.sprite.collide_rect(sprRobot, sprBall):
-        return False
-
+def ball_robot_collided(ball: 'Ball', bot: 'Robot') -> bool:
     """
-    Either one of the corners of the robot is inside the ball -OR-
-    One of the points on the ball whose tangent is parallel to an edge
-    of the robot is inside the robot.
+    If the ball/robot collided, either:
+        (1) One of the corners of the bot is inside the ball -OR-
+        (2) One of the edges of the bot is intersecting the circle -OR-
+        (3) Entire ball is within the bot
+
+    3 should never happen (unless our ball speed goes nuts) and, if it does,
+    the collision logic won't work anyways so... ignore for now.
     """
-    _rectBallInner.center = sprBall.rectDbl.center
-    if round(sprRobot.dblRotation % 90) == 0 or round(sprRobot.dblRotation % 90) == 90:
-        # robot is pure rect.
-        # "Tangent" points of the ball for 0,90,180,270 occur at 45 rot (or equiv)
-        _rectBallInner.rotation = 45
-        for tplPoint in _rectBallInner.corners:
-            if sprRobot.rectDbl.contains_point(tplPoint):
+    for corner in bot.rectDbl.corners:
+        if distance(corner, ball.rectDbl.center) < const.BALL_RADIUS:
+            return True
+
+    # get diameters parallel/perp to the robot sides
+    _rectBallInner.center = ball.rectDbl.center
+    _rectBallInner.rotation = bot.rectDbl.rotation + 45
+    lst_diameters = [
+        Line(a=ball.rectDbl.corner(FloatRect.CornerType.TOP_LEFT),
+             b=ball.rectDbl.corner(FloatRect.CornerType.BOTTOM_RIGHT)),
+        Line(a=ball.rectDbl.corner(FloatRect.CornerType.TOP_RIGHT),
+             b=ball.rectDbl.corner(FloatRect.CornerType.BOTTOM_LEFT))
+    ]
+    # if those lines intersect, ball is colliding
+    for side in bot.rectDbl.sides:
+        for diameter in lst_diameters:
+            tpl_i = get_line_intersection(side, diameter)
+            if point_within_line(tpl_i, side) and point_within_line(tpl_i, diameter):
                 return True
-
-        # Ball could have hit a corner
-        for tplPoint in sprRobot.rectDbl.corners:
-            dblDistCenter = math.pow(tplPoint.x - sprBall.rectDbl.centerx, 2)
-            dblDistCenter += math.pow(tplPoint.y - sprBall.rectDbl.centery, 2)
-            if dblDistCenter <= _dblBallRadius_Sq:  # within the radius = winn
-                return True
-    else:
-        # robot is tilted. check each edge (as a right triangle)
-        # 2 sides of the triangle will be at 0,90,180, or 270
-        _rectBallInner.rotation = 45
-        lstKeyPointsOnBall = _rectBallInner.corners
-
-        # 3rd side will be rotated according to robot's rotation
-        _rectBallInner.rotation = sprRobot.dblRotation
-        lstKeyPointsOnBall += _rectBallInner.corners
-
-        for shpTriangle in sprRobot.rectDbl.sides_as_right_triangles():
-            for tplPoint in lstKeyPointsOnBall:
-                if shpTriangle.contains_point(tplPoint):
-                    return True
-
-            # Ball could have hit a corner
-            for tplPoint in [shpTriangle.tplHyp0, shpTriangle.tplHyp1]:
-                dblDistCenter = math.pow(tplPoint.x - sprBall.rectDbl.centerx, 2)
-                dblDistCenter += math.pow(tplPoint.y - sprBall.rectDbl.centery, 2)
-                if dblDistCenter <= _dblBallRadius_Sq:  # within the radius = winn
-                    return True
 
     return False
 
@@ -143,7 +127,7 @@ def apply_force_to_ball(spr_robot: 'Robot', spr_ball: 'Ball') -> None:
             tpl_i_prev = get_line_intersection(bot_side_prev, diameter)
             if point_within_line(tpl_i, bot_side) and \
                     point_within_line(tpl_i_prev, bot_side_prev) and \
-                    point_within_line(tpl_i, diameter, buffer=.5):
+                    point_within_line(tpl_i, diameter, buffer=2):  #todo buffer of 2 is stupid... resolve your fp issues
                 # Calculate minimum distance for ball to leave the robot
                 tpl_contact = Vec2D(x=tpl_i[0] - tpl_i_prev[0], y=tpl_i[1] - tpl_i_prev[1])
                 buffer_mult = 1.1  # contact point is slightly fudged - give it some buffer
@@ -340,7 +324,7 @@ def bounce_balls(ball1: 'Ball', ball2: 'Ball') -> None:
 
 def bounce_ball_off_wall(ball: 'Ball'):
     # Bounce the ball off the wall
-    # "K_Wall" = how much to dampen the bounce
+    # "K_Wall" = how much to dampen the bouncew
     if ball.rectDbl.left < 0:
         ball.rectDbl.left *= -1.1
         ball.dbl_velocity_x *= -1 * const.BOUNCE_K_WALL
