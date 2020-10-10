@@ -121,6 +121,8 @@ class FloatRect:
         self._dblCenterY = (dblTop + dblBottom) / 2
         self._dblLeft = dblLeft
         self._dblTop = dblTop
+        self._dblRight = dblRight
+        self._dblBottom = dblBottom
         self._dblRotation = 0
 
         self._dctInitialCornersRelCenter = {  # type: Dict[FloatRect.CornerType, Point]
@@ -129,15 +131,17 @@ class FloatRect:
             FloatRect.CornerType.BOTTOM_LEFT: Point(x=-self._dblWidth / 2, y=self._dblHeight / 2),
             FloatRect.CornerType.BOTTOM_RIGHT: Point(x=self._dblWidth / 2, y=self._dblHeight / 2),
         }
-
+        self._corner_dist = distance((0,0), (self._dblWidth/2, self._dblHeight/2))
         self._dctCornersRelCenter = self._dctInitialCornersRelCenter.copy()  # type: Dict[FloatRect.CornerType, Point]
 
     def _move_linear(self, dblDeltaX: float, dblDeltaY: float):
         self._dblCenterX += dblDeltaX
         self._dblLeft += dblDeltaX
+        self._dblRight += dblDeltaX
 
         self._dblCenterY += dblDeltaY
         self._dblTop += dblDeltaY
+        self._dblBottom += dblDeltaY
 
     def copy(self) -> 'FloatRect':
         rectNew = FloatRect(0, self._dblWidth, 0, self._dblHeight)
@@ -154,11 +158,11 @@ class FloatRect:
 
     @property
     def right(self) -> float:
-        return self._dblLeft + self._dblWidth
+        return self._dblRight
 
     @property
     def bottom(self) -> float:
-        return self._dblTop + self._dblHeight
+        return self._dblBottom
 
     @property
     def left(self) -> float:
@@ -244,11 +248,11 @@ class FloatRect:
 
     @bottom.setter
     def bottom(self, dblBottom: float):
-        self._move_linear(0, dblBottom - self.bottom)
+        self._move_linear(0, dblBottom - self._dblBottom)
 
     @right.setter
     def right(self, dblRight: float):
-        self._move_linear(dblRight - self.right, 0)
+        self._move_linear(dblRight - self._dblRight, 0)
 
     @left.setter
     def left(self, dblLeft: float):
@@ -287,17 +291,31 @@ class FloatRect:
         setY = set()
         for tplKV in self._dctCornersRelCenter.items():
             enmCornerType, tplCorner = tplKV  # unpack
-            tplRotatedCorner = Point(
-                x= tplCorner.x * dblCos - tplCorner.y * dblSin,
-                y= tplCorner.x * dblSin + tplCorner.y * dblCos
-            )
-            self._dctCornersRelCenter[enmCornerType] = tplRotatedCorner
-            setX.add(tplRotatedCorner.x)
-            setY.add(tplRotatedCorner.y)
+            if dbl_new_rot == 0: # Try to cut down on fp errors
+                setX.add(tplCorner.x)
+                setY.add(tplCorner.y)
+            else:
+                tplRotatedCorner = Point(
+                    x= tplCorner.x * dblCos - tplCorner.y * dblSin,
+                    y= tplCorner.x * dblSin + tplCorner.y * dblCos
+                )
+
+                # ensure length stays consistent despite sin/cos and fp errors
+                dbl_dist_new = distance((0,0), tplRotatedCorner)
+                tpl_adj_corner = Point(
+                    x=tplRotatedCorner.x * self._corner_dist / dbl_dist_new,
+                    y=tplRotatedCorner.y * self._corner_dist / dbl_dist_new
+                )
+
+                self._dctCornersRelCenter[enmCornerType] = tpl_adj_corner
+                setX.add(tpl_adj_corner.x)
+                setY.add(tpl_adj_corner.y)
 
         # update l,r,t,b to reflect new rotation
         self._dblLeft = min(setX) + self.centerx
+        self._dblRight = max(setX) + self.centerx
         self._dblTop = min(setY) + self.centery
+        self._dblBottom = max(setY) + self.centery
 
     # endregion
 

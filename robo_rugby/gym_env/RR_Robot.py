@@ -205,7 +205,7 @@ class Robot(pygame.sprite.Sprite):
     def _move_angular(self, dblAngularVel:float,
                       tplCenterRot:Tuple[float,float] = None,
                       dblTrackToCenterAngleAdj:float = 0):
-        dblRotationPrior = dblAngularVel
+        dblRotationPrior = self.rectDbl.rotation
         tplCenterPrior = self.rectDbl.center
         self.dblRotation += dblAngularVel
 
