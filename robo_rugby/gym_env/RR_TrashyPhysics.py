@@ -63,10 +63,10 @@ def ball_robot_collided(ball: 'Ball', bot: 'Robot') -> bool:
     _rectBallInner.center = ball.rectDbl.center
     _rectBallInner.rotation = bot.rectDbl.rotation + 45
     lst_diameters = [
-        Line(a=ball.rectDbl.corner(FloatRect.CornerType.TOP_LEFT),
-             b=ball.rectDbl.corner(FloatRect.CornerType.BOTTOM_RIGHT)),
-        Line(a=ball.rectDbl.corner(FloatRect.CornerType.TOP_RIGHT),
-             b=ball.rectDbl.corner(FloatRect.CornerType.BOTTOM_LEFT))
+        Line(a=_rectBallInner.corner(FloatRect.CornerType.TOP_LEFT),
+             b=_rectBallInner.corner(FloatRect.CornerType.BOTTOM_RIGHT)),
+        Line(a=_rectBallInner.corner(FloatRect.CornerType.TOP_RIGHT),
+             b=_rectBallInner.corner(FloatRect.CornerType.BOTTOM_LEFT))
     ]
     # if those lines intersect, ball is colliding
     for side in bot.rectDbl.sides:
@@ -97,12 +97,9 @@ def collided_wall(objEntity) -> bool:
 def apply_force_to_ball(spr_robot: 'Robot', spr_ball: 'Ball') -> None:
     rect_bot = spr_robot.rectDbl  # type: FloatRect
     rect_bot_prev = spr_robot.rectDblPriorFrame  # type: FloatRect
-    rect_bot_half = rect_bot.copy()  # type: FloatRect
-    rect_bot_half.rotation = (rect_bot_prev.rotation + rect_bot.rotation) / 2
 
-    # Check pending collision point from prior frame
-    # create list of diameter lines that are parallel/perpendicular to the sides of the bot's prior position
-    _rectBallInner.rotation = 45 + rect_bot_half.rotation  # fudging this for simplicity's sake
+    # create list of diameter lines that are parallel/perpendicular to the sides of the bot's position
+    _rectBallInner.rotation = 45 + rect_bot.rotation  # fudging this for simplicity's sake
     _rectBallInner.center = spr_ball.rectDbl.center
     lst_diameters = [
         Line(
@@ -118,21 +115,25 @@ def apply_force_to_ball(spr_robot: 'Robot', spr_ball: 'Ball') -> None:
     """ CHECK FOR SURFACE COLLISION """
     # if either of these lines intersect with a side of the bot,
     # treat this as a "surface collision" and not a corner collision
+    dbl_contact_buffer = .5
     for enm_side in FloatRect.SideType:
         bot_side = rect_bot.side(enm_side)
         bot_side_prev = rect_bot_prev.side(enm_side)
         for diameter in lst_diameters:
-
             tpl_i = get_line_intersection(bot_side, diameter)
-            tpl_i_prev = get_line_intersection(bot_side_prev, diameter)
-            if point_within_line(tpl_i, bot_side) and \
-                    point_within_line(tpl_i_prev, bot_side_prev) and \
-                    point_within_line(tpl_i, diameter, buffer=2):  #todo buffer of 2 is stupid... resolve your fp issues
-                # Calculate minimum distance for ball to leave the robot
-                tpl_contact = Vec2D(x=tpl_i[0] - tpl_i_prev[0], y=tpl_i[1] - tpl_i_prev[1])
-                buffer_mult = 1.1  # contact point is slightly fudged - give it some buffer
-                spr_ball.dbl_force_x += tpl_contact.x * buffer_mult
-                spr_ball.dbl_force_y += tpl_contact.y * buffer_mult
+            if point_within_line(tpl_i, bot_side) and point_within_line(tpl_i, diameter, buffer=dbl_contact_buffer):
+                dist_a = distance(diameter.a, rect_bot.center)
+                dist_b = distance(diameter.b, rect_bot.center)
+                tpl_cp_ball = diameter.a if dist_a < dist_b else diameter.b
+                tpl_cp_ball_opp = diameter.a if dist_a >= dist_b else diameter.b
+                tpl_contact_buffer = Vec2D(
+                    x=(tpl_cp_ball_opp.x - tpl_cp_ball.x) * dbl_contact_buffer / (const.BALL_RADIUS + const.BALL_RADIUS),
+                    y=(tpl_cp_ball_opp.y - tpl_cp_ball.y) * dbl_contact_buffer / (const.BALL_RADIUS + const.BALL_RADIUS)
+                )
+                # Calculate minimum distance for ball to leave the robot according to current contact vector
+                tpl_contact = Vec2D(x=tpl_i[0] - tpl_cp_ball.x, y=tpl_i[1] - tpl_cp_ball.y)
+                spr_ball.dbl_force_x += tpl_contact.x + tpl_contact_buffer.x
+                spr_ball.dbl_force_y += tpl_contact.y + tpl_contact_buffer.y
                 spr_ball.lngFrameMass = max(spr_robot.lngFrameMass, spr_ball.lngFrameMass)
                 return  # can only be one pending collision point with this logic
 
@@ -140,7 +141,7 @@ def apply_force_to_ball(spr_robot: 'Robot', spr_ball: 'Ball') -> None:
     for enm_corner in FloatRect.CornerType:
         bot_corner = rect_bot.corner(enm_corner)
         dbl_dist_center = distance(bot_corner, spr_ball.rectDbl.center)
-        if dbl_dist_center < const.BALL_RADIUS:
+        if dbl_dist_center < const.BALL_RADIUS + dbl_contact_buffer:
             bot_corner_prev = rect_bot_prev.corner(enm_corner)
             # Let's just... fudge this a bit... instead of actually calc'ing (weighted average)
             tpl_contact = Vec2D(
@@ -149,9 +150,13 @@ def apply_force_to_ball(spr_robot: 'Robot', spr_ball: 'Ball') -> None:
 
             # Fudge this a bit, since we're not calc'ing the exact contact point on the ball
             contact_dist = distance((0, 0), tpl_contact)
+            tpl_contact_buffer = Vec2D(
+                x=tpl_contact.x * dbl_contact_buffer / contact_dist,
+                y=tpl_contact.y * dbl_contact_buffer / contact_dist
+            )
             exit_dist = (const.BALL_RADIUS - dbl_dist_center) * 1.2
-            spr_ball.dbl_force_x += tpl_contact.x * exit_dist / contact_dist
-            spr_ball.dbl_force_y += tpl_contact.y * exit_dist / contact_dist
+            spr_ball.dbl_force_x += (tpl_contact.x * exit_dist / contact_dist) + tpl_contact_buffer.x
+            spr_ball.dbl_force_y += (tpl_contact.y * exit_dist / contact_dist) + tpl_contact_buffer.y
             spr_ball.lngFrameMass = max(spr_robot.lngFrameMass, spr_ball.lngFrameMass)
             return
 
@@ -162,12 +167,9 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
 
     rect_bot = spr_robot.rectDbl  # type: FloatRect
     rect_bot_prev = spr_robot.rectDblPriorFrame  # type: FloatRect
-    rect_bot_half = rect_bot.copy()  # type: FloatRect
-    rect_bot_half.rotation = (rect_bot_prev.rotation + rect_bot.rotation) / 2
 
-    # Check pending collision point from prior frame
-    # create list of diameter lines that are parallel/perpendicular to the sides of the bot's prior position
-    _rectBallInner.rotation = 45 + rect_bot_half.rotation  # fudging this for simplicity's sake
+    # create list of diameter lines that are parallel/perpendicular to the sides of the bot's position
+    _rectBallInner.rotation = 45 + rect_bot.rotation  # fudging this for simplicity's sake
     _rectBallInner.center = spr_ball.rectDbl.center
     lst_diameters = [
         Line(
@@ -189,18 +191,13 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
         for diameter in lst_diameters:
             tpl_i = get_line_intersection(bot_side, diameter)
             tpl_i_prev = get_line_intersection(bot_side_prev, diameter)
-            if point_within_line(tpl_i, bot_side) and \
-                    point_within_line(tpl_i_prev, bot_side_prev) and \
-                    point_within_line(tpl_i, diameter, buffer=.5):
+            if point_within_line(tpl_i, bot_side) and point_within_line(tpl_i, diameter):
                 dist_a = distance(diameter.a, tpl_i_prev)
                 dist_b = distance(diameter.b, tpl_i_prev)
                 tpl_cp_ball = diameter.a if dist_a < dist_b else diameter.b
                 tpl_cp_bot = Point(*tpl_i)
-                tpl_cp_bot_prev = Point(*tpl_i_prev)
-                tpl_cp_bot_half = Point(x=(tpl_cp_bot.x + tpl_cp_bot_prev.x) / 2,
-                                        y=(tpl_cp_bot.y + tpl_cp_bot_prev.y) / 2)
 
-                tpl_contact = Vec2D(x=tpl_cp_bot_half.x - tpl_cp_ball.x, y=tpl_cp_bot_half.y - tpl_cp_ball.y)
+                tpl_contact = Vec2D(x=tpl_cp_bot.x - tpl_cp_ball.x, y=tpl_cp_bot.y - tpl_cp_ball.y)
                 tpl_ball_vel = Vec2D(x=spr_ball.dbl_velocity_x, y=spr_ball.dbl_velocity_y)
 
                 # Projected components of the ball's velocity
@@ -214,7 +211,7 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
                 if (tpl_ball_proj.y < 0 and tpl_contact.y > 0) or (tpl_ball_proj.y > 0 and tpl_contact.y < 0):
                     spr_ball.dbl_velocity_y = -tpl_ball_proj.y * const.BOUNCE_K_WALL * const.BOUNCE_K_ROBOT
 
-                tpl_exit_point = Point(*get_line_intersection(bot_side, (tpl_cp_ball, tpl_cp_bot_half)))
+                tpl_exit_point = Point(*get_line_intersection(bot_side, (tpl_cp_ball, tpl_cp_bot)))
                 spr_ball.rectDbl.centerx += (tpl_exit_point.x - tpl_cp_ball.x) * 1.1
                 spr_ball.rectDbl.centery += (tpl_exit_point.y - tpl_cp_ball.y) * 1.1
                 return
@@ -242,7 +239,7 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
             if (tpl_ball_proj.y < 0 and tpl_contact.y > 0) or (tpl_ball_proj.y > 0 and tpl_contact.y < 0):
                 spr_ball.dbl_velocity_y = -tpl_ball_proj.y * const.BOUNCE_K_WALL * const.BOUNCE_K_ROBOT
 
-            # Resolve collision - contact point is fudged, fudge travel dist accordingly
+            # Resolve collision - contact point is fudged, fudge travel dist accordingly (by using bot corner prev)
             dbl_exit_dist = distance(bot_corner_prev, spr_ball.rectDbl.center)
             dbl_contact_dist = dbl_contact_dist_sq ** .5
             spr_ball.rectDbl.centerx += tpl_contact.x * dbl_exit_dist / dbl_contact_dist
