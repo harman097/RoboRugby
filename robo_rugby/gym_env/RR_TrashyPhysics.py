@@ -15,21 +15,12 @@ def robot_in_goal(sprRobot: 'Robot', sprGoal: 'Goal') -> bool:
             return True
 
 
-def robots_collided(sprRobot1: 'Robot', sprRobot2: 'Robot') -> bool:
-    if sprRobot1.rectDbl.contains_point(sprRobot2.rectDbl.center):
-        return True
-
-    if sprRobot2.rectDbl.contains_point(sprRobot1.rectDbl.center):
-        return True
-
-    for tplCorner in sprRobot1.rectDbl.corners:
-        if sprRobot2.rectDbl.contains_point(tplCorner):
-            return True
-
-    for tplCorner in sprRobot2.rectDbl.corners:
-        if sprRobot1.rectDbl.contains_point(tplCorner):
-            return True
-
+def robots_collided(bot1: 'Robot', bot2: 'Robot') -> bool:
+    for side1 in bot1.rectDbl.sides:
+        for side2 in bot2.rectDbl.sides:
+            tpl_i = get_line_intersection(side1, side2)
+            if point_within_line(tpl_i, side1) and point_within_line(tpl_i, side2):
+                return True
     return False
 
 
@@ -165,6 +156,7 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
     if spr_ball.dbl_velocity_x == spr_ball.dbl_velocity_y == 0:
         return  # no velocity to "bounce"
 
+    dbl_contact_buffer = .5
     rect_bot = spr_robot.rectDbl  # type: FloatRect
     rect_bot_prev = spr_robot.rectDblPriorFrame  # type: FloatRect
 
@@ -195,9 +187,9 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
                 dist_a = distance(diameter.a, tpl_i_prev)
                 dist_b = distance(diameter.b, tpl_i_prev)
                 tpl_cp_ball = diameter.a if dist_a < dist_b else diameter.b
-                tpl_cp_bot = Point(*tpl_i)
+                tpl_cp_ball_opp = diameter.a if dist_a >= dist_b else diameter.b
 
-                tpl_contact = Vec2D(x=tpl_cp_bot.x - tpl_cp_ball.x, y=tpl_cp_bot.y - tpl_cp_ball.y)
+                tpl_contact = Vec2D(x=tpl_cp_ball_opp.x - tpl_cp_ball.x, y=tpl_cp_ball_opp.y - tpl_cp_ball.y)
                 tpl_ball_vel = Vec2D(x=spr_ball.dbl_velocity_x, y=spr_ball.dbl_velocity_y)
 
                 # Projected components of the ball's velocity
@@ -211,9 +203,15 @@ def bounce_ball_off_bot(spr_robot: 'Robot', spr_ball: 'Ball'):
                 if (tpl_ball_proj.y < 0 and tpl_contact.y > 0) or (tpl_ball_proj.y > 0 and tpl_contact.y < 0):
                     spr_ball.dbl_velocity_y = -tpl_ball_proj.y * const.BOUNCE_K_WALL * const.BOUNCE_K_ROBOT
 
-                tpl_exit_point = Point(*get_line_intersection(bot_side, (tpl_cp_ball, tpl_cp_bot)))
-                spr_ball.rectDbl.centerx += (tpl_exit_point.x - tpl_cp_ball.x) * 1.1
-                spr_ball.rectDbl.centery += (tpl_exit_point.y - tpl_cp_ball.y) * 1.1
+                # Create a buffer vector
+                tpl_contact_buffer = Vec2D(
+                    x=tpl_contact.x * dbl_contact_buffer / dbl_contact_dist_sq**.5,
+                    y=tpl_contact.y * dbl_contact_buffer / dbl_contact_dist_sq**.5
+                )
+
+                tpl_exit_point = Point(*tpl_i)
+                spr_ball.rectDbl.centerx += (tpl_exit_point.x - tpl_cp_ball.x) + tpl_contact_buffer.x
+                spr_ball.rectDbl.centery += (tpl_exit_point.y - tpl_cp_ball.y) + tpl_contact_buffer.y
                 return
 
     """ CHECK FOR CORNER COLLISION """

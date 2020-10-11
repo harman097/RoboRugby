@@ -76,7 +76,11 @@ def get_line_intersection(line_1: Tuple[Tuple[float, float], Tuple[float, float]
         y_I = m_1 * x_I + b_1
     else:
         x_I = (b_1 - b_2) / (m_2 - m_1)
-        y_I = m_1 * x_I + b_1
+        # use whichever line formula has less error (hopefully)
+        if abs(b_1) < abs(b_2):
+            y_I = m_1 * x_I + b_1
+        else:
+            y_I = m_2 * x_I + b_2
 
     return Point(x=x_I, y=y_I)
 
