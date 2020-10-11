@@ -309,7 +309,7 @@ class GameEnv(gym.Env):
 
         while len(lst_bot_collisions) > 0:
             lng_attempts += 1
-            if lng_attempts >= lng_attempt_limit:
+            if lng_attempts > lng_attempt_limit:
                 raise Exception("UNABLE TO RESOLVE BOT/BOT COLLISIONS")
 
             for bot1, bot2 in lst_bot_collisions:
